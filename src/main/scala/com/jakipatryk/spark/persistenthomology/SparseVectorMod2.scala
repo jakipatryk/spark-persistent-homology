@@ -4,7 +4,7 @@ package com.jakipatryk.spark.persistenthomology
  * Implementation of spare vector with coefficients in field Z2.
  * @param indicesOfOnes: list of indices of ones in the vector, sorted in decreasing order.
  */
-class SparseVectorMod2(val indicesOfOnes: List[Long]) {
+class SparseVectorMod2(val indicesOfOnes: List[Long]) extends Serializable {
 
   def isEmpty: Boolean = indicesOfOnes.isEmpty
 
