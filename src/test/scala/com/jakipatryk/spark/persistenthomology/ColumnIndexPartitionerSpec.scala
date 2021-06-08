@@ -2,10 +2,10 @@ package com.jakipatryk.spark.persistenthomology
 
 import org.scalatest.flatspec.AnyFlatSpec
 
-class InitialPartitionerSpec extends AnyFlatSpec {
+class ColumnIndexPartitionerSpec extends AnyFlatSpec {
 
   "getPartition" should "return correct partition index (odd numPartitions, even filtrationLength)" in {
-    val partitioner: InitialPartitioner = new InitialPartitioner(3, 10)
+    val partitioner: ColumnIndexPartitioner = new ColumnIndexPartitioner(3, 10)
 
     assert(partitioner.getPartition(Key(0, None)) == 0)
     assert(partitioner.getPartition(Key(1, None)) == 0)
@@ -20,7 +20,7 @@ class InitialPartitionerSpec extends AnyFlatSpec {
   }
 
   "getPartition" should "return correct partition index (even numPartitions, even filtrationLength)" in {
-    val partitioner: InitialPartitioner = new InitialPartitioner(4, 10)
+    val partitioner: ColumnIndexPartitioner = new ColumnIndexPartitioner(4, 10)
 
     assert(partitioner.getPartition(Key(0, None)) == 0)
     assert(partitioner.getPartition(Key(1, None)) == 0)
@@ -35,7 +35,7 @@ class InitialPartitionerSpec extends AnyFlatSpec {
   }
 
   "getPartition" should "return correct partition index (numPartitions = filtrationLength)" in {
-    val partitioner: InitialPartitioner = new InitialPartitioner(10, 10)
+    val partitioner: ColumnIndexPartitioner = new ColumnIndexPartitioner(10, 10)
 
     assert(partitioner.getPartition(Key(0, None)) == 0)
     assert(partitioner.getPartition(Key(1, None)) == 1)
@@ -50,7 +50,7 @@ class InitialPartitionerSpec extends AnyFlatSpec {
   }
 
   "getPartition" should "return correct partition index (filtrationLength divisible by numPartitions)" in {
-    val partitioner: InitialPartitioner = new InitialPartitioner(4, 8)
+    val partitioner: ColumnIndexPartitioner = new ColumnIndexPartitioner(4, 8)
 
     assert(partitioner.getPartition(Key(0, None)) == 0)
     assert(partitioner.getPartition(Key(1, None)) == 0)
@@ -63,7 +63,7 @@ class InitialPartitionerSpec extends AnyFlatSpec {
   }
 
   "getPartition" should "return correct partition index (numPartitions > filtrationLength)" in {
-    val partitioner: InitialPartitioner = new InitialPartitioner(3, 2)
+    val partitioner: ColumnIndexPartitioner = new ColumnIndexPartitioner(3, 2)
 
     assert(partitioner.getPartition(Key(0, None)) == 0)
     assert(partitioner.getPartition(Key(1, None)) == 1)

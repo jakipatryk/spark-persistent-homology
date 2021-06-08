@@ -2,10 +2,10 @@ package com.jakipatryk.spark.persistenthomology
 
 import org.scalatest.flatspec.AnyFlatSpec
 
-class IterationPartitionerSpec extends AnyFlatSpec {
+class PivotPartitionerSpec extends AnyFlatSpec {
 
   "getPartition" should "return correct partition index" in {
-    val partitioner = new IterationPartitioner(3, 10)
+    val partitioner = new PivotPartitioner(3, 10)
 
     assert(partitioner.getPartition(Key(0, Some(0))) == 0)
     assert(partitioner.getPartition(Key(1, Some(1))) == 0)
