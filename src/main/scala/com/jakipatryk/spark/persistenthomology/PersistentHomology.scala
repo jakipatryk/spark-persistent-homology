@@ -20,7 +20,12 @@ class IndicesPartitioner(val numPartitions: Int, val filtrationLength: Long) ext
 
 object PersistentHomology {
 
-  /** Takes a boundary matrix of a filtration and computes all persistence pairs (including infinite ones). */
+  /**
+   * Takes a boundary matrix of a filtration and computes all persistence pairs (including infinite ones).
+   * @param boundaryMatrix - RDD representing boundary matrix of the filtration
+   * @param numOfPartitions - number of partitions to use when calculating persistent homology
+   * @return All (finite and infinite) persistence pairs
+   */
   def getPersistencePairs(boundaryMatrix: RDD[(Key, Chain)], numOfPartitions: Int): RDD[PersistencePair] = {
     val filtrationLength = boundaryMatrix.count()
     val reducedMatrix = BoundaryMatrixReduction.reduceBoundaryMatrix(boundaryMatrix, numOfPartitions)
@@ -41,9 +46,11 @@ object PersistentHomology {
     val allFiniteIndices = finitePairs flatMap {
       case PersistencePair(birthIndex, Left(deathIndex)) => (birthIndex, ()) :: (deathIndex, ()) :: Nil
     }
+
     val partitioner = new IndicesPartitioner(numOfPartitions, filtrationLength)
     val partitionRangeLength = Math.ceil(filtrationLength.toDouble / numOfPartitions).toLong
-    val infinitePairs = allFiniteIndices
+
+    allFiniteIndices
       .repartitionAndSortWithinPartitions(partitioner)
       .mapPartitionsWithIndex {
         (index, partition) => {
@@ -61,7 +68,6 @@ object PersistentHomology {
             .iterator
         }
       }
-    infinitePairs
   }
 
 }
