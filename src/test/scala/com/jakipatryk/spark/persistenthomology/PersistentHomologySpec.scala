@@ -1,12 +1,22 @@
 package com.jakipatryk.spark.persistenthomology
 
 import org.apache.spark.{SparkConf, SparkContext}
+import org.scalatest.BeforeAndAfterAll
 import org.scalatest.flatspec.AnyFlatSpec
 
-class PersistentHomologySpec extends AnyFlatSpec with DataLoader {
-  val sparkContext = new SparkContext(
-    new SparkConf().setAppName("PersistentHomologySpec").setMaster("local[*]")
-  )
+class PersistentHomologySpec extends AnyFlatSpec with DataLoader with BeforeAndAfterAll {
+
+  var sparkContext: SparkContext = null
+
+  override def beforeAll(): Unit = {
+    sparkContext = new SparkContext(
+      new SparkConf().setAppName("BoundaryMatrixReductionSpec").setMaster("local[*]")
+    )
+  }
+
+  override def afterAll(): Unit = {
+    sparkContext.stop()
+  }
 
   "getPersistencePairs" should "return all finite and infinite persistence pairs for 10 triangles" in {
     val data = sparkContext.parallelize(nSeparateTriangles(10).toList)

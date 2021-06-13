@@ -1,14 +1,23 @@
 package com.jakipatryk.spark.persistenthomology
 
 import org.apache.spark.{SparkConf, SparkContext}
+import org.scalatest.BeforeAndAfterAll
 import org.scalatest.flatspec.AnyFlatSpec
 
 
-class BoundaryMatrixReductionSpec extends AnyFlatSpec with DataLoader {
+class BoundaryMatrixReductionSpec extends AnyFlatSpec with DataLoader with BeforeAndAfterAll {
 
-  val sparkContext = new SparkContext(
-    new SparkConf().setAppName("BoundaryMatrixReductionSpec").setMaster("local[*]")
-  )
+  var sparkContext: SparkContext = _
+
+  override def beforeAll(): Unit = {
+    sparkContext = new SparkContext(
+      new SparkConf().setAppName("BoundaryMatrixReductionSpec").setMaster("local[*]")
+    )
+  }
+
+  override def afterAll(): Unit = {
+    sparkContext.stop()
+  }
 
   "reduceBlock" should "make matrix reduced if the entire boundary matrix is given and block range is whole matrix" in {
     val data = nSeparateTriangles(3)
