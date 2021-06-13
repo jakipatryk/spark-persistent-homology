@@ -26,26 +26,18 @@ class BoundaryMatrixReductionSpec extends AnyFlatSpec with DataLoader with Befor
       .toList
       .sortBy { case (k, _) => k.indexInMatrix }
 
-    // 0-dimensional homology classes are born when points are added to the filtration
-    assert(result.slice(0, 9).forall { case (k, c) => k.pivot.isEmpty && c.isEmpty })
-
     // newer 0-dimensional homology classes die when points get connected
-    assert(result(9)._1.pivot.contains(1) && result(9)._2.asVector.indicesOfOnes == (1L :: 0L :: Nil))
-    assert(result(10)._1.pivot.contains(4) && result(10)._2.asVector.indicesOfOnes == (4L :: 3L :: Nil))
-    assert(result(11)._1.pivot.contains(7) && result(11)._2.asVector.indicesOfOnes == (7L :: 6L :: Nil))
-    assert(result(12)._1.pivot.contains(2) && result(12)._2.asVector.indicesOfOnes == (2L :: 1L :: Nil))
-    assert(result(13)._1.pivot.contains(5) && result(13)._2.asVector.indicesOfOnes == (5L :: 4L :: Nil))
-    assert(result(14)._1.pivot.contains(8) && result(14)._2.asVector.indicesOfOnes == (8L :: 7L :: Nil))
-
-    // 1-dimensional homology classes are born when line segments start forming a boundary
-    assert(result(15)._1.pivot.isEmpty && result(15)._2.isEmpty)
-    assert(result(16)._1.pivot.isEmpty && result(16)._2.isEmpty)
-    assert(result(17)._1.pivot.isEmpty && result(17)._2.isEmpty)
+    assert(result(0)._1.pivot.contains(1) && result(0)._2.asVector.indicesOfOnes == (1L :: 0L :: Nil))
+    assert(result(1)._1.pivot.contains(4) && result(1)._2.asVector.indicesOfOnes == (4L :: 3L :: Nil))
+    assert(result(2)._1.pivot.contains(7) && result(2)._2.asVector.indicesOfOnes == (7L :: 6L :: Nil))
+    assert(result(3)._1.pivot.contains(2) && result(3)._2.asVector.indicesOfOnes == (2L :: 1L :: Nil))
+    assert(result(4)._1.pivot.contains(5) && result(4)._2.asVector.indicesOfOnes == (5L :: 4L :: Nil))
+    assert(result(5)._1.pivot.contains(8) && result(5)._2.asVector.indicesOfOnes == (8L :: 7L :: Nil))
 
     // 1-dimensional homology classes die when triangles get filled
-    assert(result(18)._1.pivot.contains(15) && result(18)._2.asVector.indicesOfOnes == (15L :: 12L :: 9L :: Nil))
-    assert(result(19)._1.pivot.contains(16) && result(19)._2.asVector.indicesOfOnes == (16L :: 13L :: 10L :: Nil))
-    assert(result(20)._1.pivot.contains(17) && result(20)._2.asVector.indicesOfOnes == (17L :: 14L :: 11L :: Nil))
+    assert(result(6)._1.pivot.contains(15) && result(6)._2.asVector.indicesOfOnes == (15L :: 12L :: 9L :: Nil))
+    assert(result(7)._1.pivot.contains(16) && result(7)._2.asVector.indicesOfOnes == (16L :: 13L :: 10L :: Nil))
+    assert(result(8)._1.pivot.contains(17) && result(8)._2.asVector.indicesOfOnes == (17L :: 14L :: 11L :: Nil))
   }
 
   "reduceBlock" should "reduce columns in the block (no two have the same pivot in the block row range)" in {
@@ -66,13 +58,15 @@ class BoundaryMatrixReductionSpec extends AnyFlatSpec with DataLoader with Befor
     assert(result(0) == (Key(4L, Some(2)), Chain(2L :: Nil)))
     assert(result(1) == (Key(8L, Some(3)), Chain(3L :: 2L :: Nil)))
 
-    // these should have been reduced by the algorithm
-    assert(result(2) == (Key(15L, None), Chain(Empty)))
-    assert(result(3) == (Key(17L, Some(4L)), Chain(4L :: 3L :: 2L :: Nil)))
-    assert(result(4) == (Key(19L, None), Chain(Empty)))
+    // this should have been reduced by the algorithm
+    assert(result(2) == (Key(17L, Some(4L)), Chain(4L :: 3L :: 2L :: Nil)))
+
+    // this should have been removed as they become zero
+    assert(!result.contains((Key(15L, None), Chain(Empty))))
+    assert(!result.contains((Key(19L, None), Chain(Empty))))
 
     // this should not have been reduced, because they have index greater than the current block column range
-    assert(result(5) == (Key(24L, Some(3L)), Chain(3L :: 2L :: Nil)))
+    assert(result(3) == (Key(24L, Some(3L)), Chain(3L :: 2L :: Nil)))
   }
 
   "reduceBoundaryMatrix" should "reduce boundary matrix of 10 triangles with 3 partitions correctly" in {

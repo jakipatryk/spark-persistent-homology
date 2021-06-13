@@ -31,7 +31,7 @@ object BoundaryMatrixReduction {
       val pivot: Long = currentChain.pivot.getOrElse(-1)
       if (pivot >= blockRowRange._1 && pivot <= blockRowRange._2) {
         reduced.put(currentChain.pivot, (Key(key.indexInMatrix, currentChain.pivot), currentChain))
-      } else {
+      } else if(currentChain.pivot.nonEmpty) {
         processedButUnreduced = (Key(key.indexInMatrix, currentChain.pivot), currentChain) :: processedButUnreduced
       }
     }
@@ -68,7 +68,6 @@ object BoundaryMatrixReduction {
         }
 
       reducedMatrix = reducedMatrix
-        .filter { case (k, _) => k.pivot.nonEmpty }
         .repartitionAndSortWithinPartitions(partitioner)
     }
 
