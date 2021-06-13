@@ -44,14 +44,14 @@ object BoundaryMatrixReduction {
                             numOfPartitions: Int,
                             filtrationLength: Long): RDD[(Key, Chain)] = {
 
+    val partitioner = new PivotPartitioner(numOfPartitions, filtrationLength)
+
     implicit val keyOrdering: Ordering[Key] = Ordering.by[Key, Long](_.indexInMatrix)
 
     var reducedMatrix = boundaryMatrix
       .filter { case (k, _) => k.pivot.nonEmpty }
-      .repartitionAndSortWithinPartitions(new ColumnIndexPartitioner(numOfPartitions, filtrationLength))
+      .repartitionAndSortWithinPartitions(partitioner)
       .cache()
-
-    val iterationPartitioner = new PivotPartitioner(numOfPartitions, filtrationLength)
 
     val blockRangeLength = Math.ceil(filtrationLength.toDouble / numOfPartitions).toLong
 
@@ -69,7 +69,7 @@ object BoundaryMatrixReduction {
 
       reducedMatrix = reducedMatrix
         .filter { case (k, _) => k.pivot.nonEmpty }
-        .repartitionAndSortWithinPartitions(iterationPartitioner)
+        .repartitionAndSortWithinPartitions(partitioner)
     }
 
     reducedMatrix
