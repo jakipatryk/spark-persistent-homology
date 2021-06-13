@@ -77,10 +77,11 @@ class BoundaryMatrixReductionSpec extends AnyFlatSpec with DataLoader with Befor
 
   "reduceBoundaryMatrix" should "reduce boundary matrix of 10 triangles with 3 partitions correctly" in {
     val data = sparkContext.parallelize(nSeparateTriangles(10).toList)
+    val filtrationLength = data.count()
 
     val result =
       BoundaryMatrixReduction
-        .reduceBoundaryMatrix(data, 3)
+        .reduceBoundaryMatrix(data, 3, filtrationLength)
         .collect()
         .toList
         .sortBy { case (k, _) => k.indexInMatrix }
@@ -90,10 +91,11 @@ class BoundaryMatrixReductionSpec extends AnyFlatSpec with DataLoader with Befor
 
   "reduceBoundaryMatrix" should "reduce boundary matrix of 10 triangles with 8 partitions correctly" in {
     val data = sparkContext.parallelize(nSeparateTriangles(10).toList)
+    val filtrationLength = data.count()
 
     val result =
       BoundaryMatrixReduction
-        .reduceBoundaryMatrix(data, 8)
+        .reduceBoundaryMatrix(data, 8, filtrationLength)
         .collect()
         .toList
         .sortBy { case (k, _) => k.indexInMatrix }

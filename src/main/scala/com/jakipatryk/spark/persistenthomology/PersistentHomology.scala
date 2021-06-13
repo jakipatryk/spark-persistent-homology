@@ -28,7 +28,7 @@ object PersistentHomology {
    */
   def getPersistencePairs(boundaryMatrix: RDD[(Key, Chain)], numOfPartitions: Int): RDD[PersistencePair] = {
     val filtrationLength = boundaryMatrix.count()
-    val reducedMatrix = BoundaryMatrixReduction.reduceBoundaryMatrix(boundaryMatrix, numOfPartitions)
+    val reducedMatrix = BoundaryMatrixReduction.reduceBoundaryMatrix(boundaryMatrix, numOfPartitions, filtrationLength)
 
     val finitePairs = reducedMatrix map {
       case (Key(indexInMatrix, Some(pivot)), _) => PersistencePair(pivot, Left(indexInMatrix))

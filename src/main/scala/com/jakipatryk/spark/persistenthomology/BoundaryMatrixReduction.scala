@@ -39,8 +39,10 @@ object BoundaryMatrixReduction {
     reduced.toList.map { case (_, v) => v }.iterator ++ processedButUnreduced.iterator ++ toReduceLater
   }
 
-  def reduceBoundaryMatrix(boundaryMatrix: RDD[(Key, Chain)], numOfPartitions: Int): RDD[(Key, Chain)] = {
-    val filtrationLength = boundaryMatrix.count()
+  def reduceBoundaryMatrix(
+                            boundaryMatrix: RDD[(Key, Chain)],
+                            numOfPartitions: Int,
+                            filtrationLength: Long): RDD[(Key, Chain)] = {
 
     implicit val keyOrdering: Ordering[Key] = Ordering.by[Key, Long](_.indexInMatrix)
 
