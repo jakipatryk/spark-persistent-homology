@@ -3,7 +3,7 @@ package com.jakipatryk.spark.persistenthomology
 import scala.annotation.tailrec
 
 /**
- * Implementation of spare vector with coefficients in field Z2.
+ * Implementation of sparse vector with coefficients in field Z2.
  * @param indicesOfOnes: list of indices of ones in the vector, sorted in decreasing order.
  */
 class SparseVectorMod2(val indicesOfOnes: List[Long]) extends Serializable {
