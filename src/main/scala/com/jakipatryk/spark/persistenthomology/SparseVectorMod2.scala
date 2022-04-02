@@ -1,5 +1,7 @@
 package com.jakipatryk.spark.persistenthomology
 
+import scala.annotation.tailrec
+
 /**
  * Implementation of spare vector with coefficients in field Z2.
  * @param indicesOfOnes: list of indices of ones in the vector, sorted in decreasing order.
@@ -14,19 +16,20 @@ class SparseVectorMod2(val indicesOfOnes: List[Long]) extends Serializable {
   }
 
   def +(other: SparseVectorMod2): SparseVectorMod2 = {
-    def aux(a: List[Long], b: List[Long]): List[Long] = {
+    @tailrec
+    def aux(acc: List[Long], a: List[Long], b: List[Long]): List[Long] = {
       (a, b) match {
-        case (Nil, Nil) => Nil
-        case (x :: rest, Nil) => x :: aux(rest, b)
-        case (Nil, y :: rest) => y :: aux(a, rest)
-        case (x :: rest1, y :: rest2) =>
-          if(x == y) aux(rest1, rest2)
-          else if(x > y) x :: aux(rest1, b)
-          else y :: aux(a, rest2)
+        case (Nil, Nil) => acc
+        case (x :: restX, Nil) => aux(x :: acc, restX, Nil)
+        case (Nil, y :: restY) => aux(y :: acc, Nil, restY)
+        case (x :: restX, y :: restY) =>
+          if(x == y) aux(acc, restX, restY)
+          else if(x > y) aux(x :: acc, restX, b)
+          else aux(y :: acc, a, restY)
       }
     }
 
-    new SparseVectorMod2(aux(indicesOfOnes, other.indicesOfOnes))
+    new SparseVectorMod2(aux(Nil, indicesOfOnes, other.indicesOfOnes).reverse)
   }
 
   override def equals(other: Any): Boolean = other match {
