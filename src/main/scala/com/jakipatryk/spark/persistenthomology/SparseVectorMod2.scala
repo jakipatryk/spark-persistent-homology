@@ -29,7 +29,12 @@ class SparseVectorMod2(val indicesOfOnes: List[Long]) extends Serializable {
       }
     }
 
-    new SparseVectorMod2(aux(Nil, indicesOfOnes, other.indicesOfOnes).reverse)
+    if(other.isEmpty) this
+    else {
+      val resultListOfIndices = aux(Nil, indicesOfOnes, other.indicesOfOnes).reverse
+      if(resultListOfIndices.isEmpty) Empty
+      else new SparseVectorMod2(resultListOfIndices)
+    }
   }
 
   override def equals(other: Any): Boolean = other match {
@@ -41,4 +46,6 @@ class SparseVectorMod2(val indicesOfOnes: List[Long]) extends Serializable {
 
 }
 
-object Empty extends SparseVectorMod2(Nil)
+object Empty extends SparseVectorMod2(Nil) {
+  override def +(other: SparseVectorMod2): SparseVectorMod2 = other
+}
