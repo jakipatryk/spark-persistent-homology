@@ -12,31 +12,40 @@ object BoundaryMatrixReduction {
                    blockRowRange: (Long, Long)
                  ): Iterator[(Key, Chain)] = {
 
-    val (alreadyReduced, unreduced) = partition.span { case (key, _) => key.indexInMatrix < blockColumnRange._1 }
+    val (alreadyReduced, unreduced) = partition.span {
+      case (key, _) => key.indexInMatrix < blockColumnRange._1
+    }
     val (unreducedToProcess, toReduceLater) = unreduced.span {
       case (key, _) => key.indexInMatrix <= blockColumnRange._2
     }
+
     val reduced = mutable.HashMap(
       alreadyReduced
-      .toList
-      .map { case (k, c) => (k.pivot, (k, c)) }: _*
+        .toSeq
+        .map { case (k, c) => (k.pivot, (k, c)) }: _*
     )
-    var processedButUnreduced: List[(Key, Chain)] = Nil
 
-    for ((key, chain) <- unreducedToProcess) {
-      var currentChain = chain
-      while (currentChain.pivot.nonEmpty && reduced.contains(currentChain.pivot)) {
-        currentChain = currentChain + reduced(currentChain.pivot)._2
-      }
-      val pivot: Long = currentChain.pivot.getOrElse(-1)
-      if (pivot >= blockRowRange._1 && pivot <= blockRowRange._2) {
-        reduced.put(currentChain.pivot, (Key(key.indexInMatrix, currentChain.pivot), currentChain))
-      } else if(currentChain.pivot.nonEmpty) {
-        processedButUnreduced = (Key(key.indexInMatrix, currentChain.pivot), currentChain) :: processedButUnreduced
+    val processedButUnreduced: Iterator[(Key, Chain)] = unreducedToProcess.flatMap {
+      case (key, column) => {
+        var currentColumn = column
+        while (currentColumn.pivot.nonEmpty && reduced.contains(currentColumn.pivot)) {
+          currentColumn = currentColumn + reduced(currentColumn.pivot)._2
+        }
+
+        val pivot: Long = currentColumn.pivot.getOrElse(-1)
+        if (pivot >= blockRowRange._1 && pivot <= blockRowRange._2) {
+          reduced
+            .put(Some(pivot), (Key(key.indexInMatrix, Some(pivot)), currentColumn))
+          Iterator.empty
+        } else if(currentColumn.pivot.nonEmpty)
+          Iterator.single((Key(key.indexInMatrix, Some(pivot)), currentColumn))
+        else Iterator.empty
       }
     }
 
-    reduced.toList.map { case (_, v) => v }.iterator ++ processedButUnreduced.iterator ++ toReduceLater
+    processedButUnreduced ++
+      toReduceLater ++
+      reduced.iterator.map { case (_, v) => v }
   }
 
   def reduceBoundaryMatrix(
