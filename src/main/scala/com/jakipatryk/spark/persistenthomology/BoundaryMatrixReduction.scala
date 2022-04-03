@@ -60,7 +60,6 @@ object BoundaryMatrixReduction {
     var reducedMatrix = boundaryMatrix
       .filter { case (k, _) => k.pivot.nonEmpty }
       .repartitionAndSortWithinPartitions(partitioner)
-      .cache()
 
     val blockRangeLength = Math.ceil(filtrationLength.toDouble / numOfPartitions).toLong
 
