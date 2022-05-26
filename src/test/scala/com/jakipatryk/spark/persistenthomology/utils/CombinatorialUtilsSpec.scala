@@ -10,7 +10,7 @@ class CombinatorialUtilsSpec extends AnyFlatSpec with BeforeAndAfterAll {
 
   override def beforeAll(): Unit = {
     sparkContext = new SparkContext(
-      new SparkConf().setAppName("BoundaryMatrixReductionSpec").setMaster("local[*]")
+      new SparkConf().setAppName("CombinatorialUtilsSpec").setMaster("local[*]")
     )
     sparkContext.setLogLevel("ERROR")
   }
