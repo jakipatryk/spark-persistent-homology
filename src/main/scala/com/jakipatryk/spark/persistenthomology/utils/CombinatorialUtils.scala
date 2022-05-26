@@ -19,27 +19,31 @@ object CombinatorialUtils extends Serializable {
                                             f: List[(T, Long)] => V
                                           ): RDD[(V, List[Long])] = {
     val withIndex = rdd.zipWithIndex().cache()
-    var finalRdd = withIndex.map {
+    var prevRdd = withIndex.map {
       case (value, index) =>
         val l = List((value, index))
         (f(l), l)
     }
-    var prevRdd = finalRdd
+    var finalRdd = prevRdd
 
     for (_ <- 0 until (n - 1)) {
       prevRdd = prevRdd
         .cartesian(withIndex)
-        .filter { case ((_, l), (_, i)) => l.head._2 < i }
+        .filter {
+          case ((_, combination), (_, index)) =>
+            combination.head._2 < index
+        }
         .map {
-          case ((_, list), (value, index)) =>
-            val newList = (value, index) :: list
-            (f(newList), newList)
+          case ((_, combination), (value, index)) =>
+            val newCombination = (value, index) :: combination
+            (f(newCombination), newCombination)
         }
       finalRdd = finalRdd union prevRdd
     }
 
     finalRdd.map {
-      case (value, list) => (value, list.map { case (_, index) => index })
+      case (combinationValue, combination) =>
+        (combinationValue, combination.map { case (_, index) => index })
     }
   }
 
