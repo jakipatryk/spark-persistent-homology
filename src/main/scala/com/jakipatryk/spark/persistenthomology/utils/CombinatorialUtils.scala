@@ -4,6 +4,15 @@ import org.apache.spark.rdd.RDD
 
 object CombinatorialUtils extends Serializable {
 
+  /**
+   * Computes function f for all combinations of elements of an RDD,
+   * up to combinations containing n elements
+   * @param rdd RDD of any type used to generate combinations of its elements
+   * @param n Integer indicating what is the max number of elements in any combination
+   * @param f Function to be computed on combinations
+   * @return RDD containing results of application of f
+   *         on each combination and indices used in this combination
+   */
   def computeForAllCombinationsUpToN[T, V](
                                             rdd: RDD[T],
                                             n: Int,
@@ -29,7 +38,9 @@ object CombinatorialUtils extends Serializable {
       finalRdd = finalRdd union prevRdd
     }
 
-    finalRdd.map { case (value, list) => (value, list.map { case (_, index) => index })}
+    finalRdd.map {
+      case (value, list) => (value, list.map { case (_, index) => index })
+    }
   }
 
 }
