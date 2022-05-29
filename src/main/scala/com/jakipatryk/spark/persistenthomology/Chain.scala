@@ -1,5 +1,7 @@
 package com.jakipatryk.spark.persistenthomology
 
+import com.jakipatryk.spark.persistenthomology.utils.SparseVectorMod2
+
 class Chain(val asVector: SparseVectorMod2) extends Serializable {
   def pivot: Option[Long] = asVector.first
 

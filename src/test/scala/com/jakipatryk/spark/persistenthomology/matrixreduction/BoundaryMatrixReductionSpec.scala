@@ -1,5 +1,7 @@
-package com.jakipatryk.spark.persistenthomology
+package com.jakipatryk.spark.persistenthomology.matrixreduction
 
+import com.jakipatryk.spark.persistenthomology.utils.Empty
+import com.jakipatryk.spark.persistenthomology.{Chain, DataLoader, Key}
 import org.apache.spark.{SparkConf, SparkContext}
 import org.scalatest.BeforeAndAfterAll
 import org.scalatest.flatspec.AnyFlatSpec
@@ -13,6 +15,7 @@ class BoundaryMatrixReductionSpec extends AnyFlatSpec with DataLoader with Befor
     sparkContext = new SparkContext(
       new SparkConf().setAppName("BoundaryMatrixReductionSpec").setMaster("local[*]")
     )
+    sparkContext.setLogLevel("ERROR")
   }
 
   override def afterAll(): Unit = {

@@ -1,6 +1,6 @@
-package com.jakipatryk.spark.persistenthomology
+package com.jakipatryk.spark.persistenthomology.matrixreduction
 
-import org.apache.spark.rdd.RDD
+import com.jakipatryk.spark.persistenthomology.{Chain, Key}
 
 import scala.collection.mutable
 
@@ -26,7 +26,7 @@ object BoundaryMatrixReduction {
     )
 
     val processedButUnreduced: Iterator[(Key, Chain)] = unreducedToProcess.flatMap {
-      case (key, column) => {
+      case (key, column) =>
         var currentColumn = column
         while (currentColumn.pivot.nonEmpty && reduced.contains(currentColumn.pivot)) {
           currentColumn = currentColumn + reduced(currentColumn.pivot)._2
@@ -37,10 +37,9 @@ object BoundaryMatrixReduction {
           reduced
             .put(Some(pivot), (Key(key.indexInMatrix, Some(pivot)), currentColumn))
           Iterator.empty
-        } else if(currentColumn.pivot.nonEmpty)
+        } else if (currentColumn.pivot.nonEmpty)
           Iterator.single((Key(key.indexInMatrix, Some(pivot)), currentColumn))
         else Iterator.empty
-      }
     }
 
     processedButUnreduced ++
@@ -49,11 +48,12 @@ object BoundaryMatrixReduction {
   }
 
   def reduceBoundaryMatrix(
-                            boundaryMatrix: RDD[(Key, Chain)],
+                            boundaryMatrix: BoundaryMatrix,
                             numOfPartitions: Int,
-                            filtrationLength: Long): RDD[(Key, Chain)] = {
+                            boundaryMatrixInitialLength: Long
+                          ): BoundaryMatrix = {
 
-    val partitioner = new PivotPartitioner(numOfPartitions, filtrationLength)
+    val partitioner = new PivotPartitioner(numOfPartitions, boundaryMatrixInitialLength)
 
     implicit val keyOrdering: Ordering[Key] = Ordering.by[Key, Long](_.indexInMatrix)
 
@@ -61,18 +61,21 @@ object BoundaryMatrixReduction {
       .filter { case (k, _) => k.pivot.nonEmpty }
       .repartitionAndSortWithinPartitions(partitioner)
 
-    val blockRangeLength = Math.ceil(filtrationLength.toDouble / numOfPartitions).toLong
+    val blockRangeLength = Math.ceil(boundaryMatrixInitialLength.toDouble / numOfPartitions).toLong
 
     for (step <- 0 until numOfPartitions) {
       reducedMatrix = reducedMatrix
         .mapPartitionsWithIndex {
           case (partitionIndex, partitionIterator) =>
-            val columnRange = (
-              partitionIndex * blockRangeLength + step * blockRangeLength,
-              (partitionIndex + 1) * blockRangeLength + step * blockRangeLength - 1
-            )
-            val rowRange = (partitionIndex * blockRangeLength, (partitionIndex + 1) * blockRangeLength - 1)
-            reduceBlock(partitionIterator, columnRange, rowRange)
+            if (numOfPartitions - partitionIndex < step) partitionIterator
+            else {
+              val columnRange = (
+                partitionIndex * blockRangeLength + step * blockRangeLength,
+                (partitionIndex + 1) * blockRangeLength + step * blockRangeLength - 1
+              )
+              val rowRange = (partitionIndex * blockRangeLength, (partitionIndex + 1) * blockRangeLength - 1)
+              reduceBlock(partitionIterator, columnRange, rowRange)
+            }
         }
 
       reducedMatrix = reducedMatrix
