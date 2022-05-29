@@ -12,7 +12,9 @@ package object filtrations {
 
   /**
    * Type alias for filtration.
-   * IMPORTANT: filtration is expected to be sorted by (InitThreshold, DimOfSimplex)
+   * Simplex boundary is with respect to indices of these simplices in boundary matrix.
+   * IMPORTANT: Filtration is expected to be sorted by (InitThreshold, DimOfSimplex),
+   *            thus Filtration is ready to be converted to boundary matrix.
    */
   type Filtration = RDD[(IndexInMatrix, InitThreshold, SimplexBoundary)]
 
