@@ -28,7 +28,7 @@ object VietorisRipsFiltrationCreator extends FiltrationCreator {
     pointsDefiningSimplexToBoundaryChain(pointsDefiningBoundaryRDD)
   }
 
-  private[persistenthomology] def computeThreshold(distanceCalculator: DistanceCalculator)
+  private[this] def computeThreshold(distanceCalculator: DistanceCalculator)
                                                   (combination: List[(Vector[Double], Long)]): Double =
     combination match {
       case _ :: Nil => 0.0
