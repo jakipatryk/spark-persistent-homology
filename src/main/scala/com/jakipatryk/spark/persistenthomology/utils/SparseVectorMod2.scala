@@ -1,4 +1,4 @@
-package com.jakipatryk.spark.persistenthomology
+package com.jakipatryk.spark.persistenthomology.utils
 
 import scala.annotation.tailrec
 

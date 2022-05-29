@@ -1,5 +1,6 @@
-package com.jakipatryk.spark.persistenthomology
+package com.jakipatryk.spark.persistenthomology.matrixreduction
 
+import com.jakipatryk.spark.persistenthomology.Key
 import org.scalatest.flatspec.AnyFlatSpec
 
 class PivotPartitionerSpec extends AnyFlatSpec {
