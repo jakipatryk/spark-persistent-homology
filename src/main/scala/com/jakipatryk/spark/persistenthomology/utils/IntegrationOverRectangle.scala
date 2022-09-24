@@ -4,8 +4,8 @@ import scala.util.Random
 
 object IntegrationOverRectangle {
 
-  def computeMonteCarloIntegral(f: (Double, Double) => Double)
-                               (rectangleBottomLeftCoordinate: (Double, Double),
+  def computeMonteCarloIntegral(f: (Double, Double) => Double,
+                                rectangleBottomLeftCoordinate: (Double, Double),
                                 rectangleXLength: Double,
                                 rectangleYLength: Double,
                                 numSamples: Int = 20

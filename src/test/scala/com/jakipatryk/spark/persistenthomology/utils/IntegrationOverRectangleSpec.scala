@@ -13,7 +13,7 @@ class IntegrationOverRectangleSpec extends AnyFlatSpec {
     val squareLength = 1.0
 
     val resultIntegral = IntegrationOverRectangle
-      .computeMonteCarloIntegral(f)(squareBottomLeftCoordinate, squareLength, squareLength)
+      .computeMonteCarloIntegral(f, squareBottomLeftCoordinate, squareLength, squareLength)
 
     assert(resultIntegral == 5.0)
   }
@@ -26,7 +26,7 @@ class IntegrationOverRectangleSpec extends AnyFlatSpec {
     val squareLength = 2.0
 
     val resultIntegral = IntegrationOverRectangle
-      .computeMonteCarloIntegral(f)(squareBottomLeftCoordinate, squareLength, squareLength)
+      .computeMonteCarloIntegral(f, squareBottomLeftCoordinate, squareLength, squareLength)
 
     assert(resultIntegral == 20.0)
   }
@@ -39,7 +39,7 @@ class IntegrationOverRectangleSpec extends AnyFlatSpec {
     val squareLength = 2.0
 
     val resultIntegral = IntegrationOverRectangle
-      .computeMonteCarloIntegral(f)(squareBottomLeftCoordinate, squareLength, squareLength)
+      .computeMonteCarloIntegral(f, squareBottomLeftCoordinate, squareLength, squareLength)
 
     assert(resultIntegral == 60.0)
   }
@@ -52,7 +52,7 @@ class IntegrationOverRectangleSpec extends AnyFlatSpec {
     val squareLength = 2.0
 
     val resultIntegral = IntegrationOverRectangle
-      .computeMonteCarloIntegral(f)(squareBottomLeftCoordinate, squareLength, squareLength)
+      .computeMonteCarloIntegral(f, squareBottomLeftCoordinate, squareLength, squareLength)
 
     assert(resultIntegral == 20.0)
   }
@@ -66,7 +66,7 @@ class IntegrationOverRectangleSpec extends AnyFlatSpec {
     val rectangleYLength = 2.0
 
     val resultIntegral = IntegrationOverRectangle
-      .computeMonteCarloIntegral(f)(rectangleBottomLeftCoordinate, rectangleXLength, rectangleYLength)
+      .computeMonteCarloIntegral(f, rectangleBottomLeftCoordinate, rectangleXLength, rectangleYLength)
 
     assert(resultIntegral == 10.0)
   }
@@ -80,7 +80,7 @@ class IntegrationOverRectangleSpec extends AnyFlatSpec {
     val rectangleYLength = 2.0
 
     val resultIntegral = IntegrationOverRectangle
-      .computeMonteCarloIntegral(f)(rectangleBottomLeftCoordinate, rectangleXLength, rectangleYLength)
+      .computeMonteCarloIntegral(f, rectangleBottomLeftCoordinate, rectangleXLength, rectangleYLength)
 
     assert(resultIntegral == 30.0)
   }
@@ -94,7 +94,7 @@ class IntegrationOverRectangleSpec extends AnyFlatSpec {
     val rectangleYLength = 2.0
 
     val resultIntegral = IntegrationOverRectangle
-      .computeMonteCarloIntegral(f)(rectangleBottomLeftCoordinate, rectangleXLength, rectangleYLength, 100000)
+      .computeMonteCarloIntegral(f, rectangleBottomLeftCoordinate, rectangleXLength, rectangleYLength, 100000)
 
     implicit val doubleEq: Equality[Double] = TolerantNumerics.tolerantDoubleEquality(0.1)
     assert(resultIntegral === 3.0)
