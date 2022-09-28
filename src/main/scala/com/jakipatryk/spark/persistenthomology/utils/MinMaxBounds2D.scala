@@ -21,7 +21,7 @@ case class SingleDimMinMaxBound[T](min: T, max: T)(implicit n: Numeric[T]) {
 }
 
 /**
- * Represents minimum and maximum values in a single dimension.
+ * Represents minimum and maximum values in each of two dimensions.
  * @tparam T type that has implicit Numeric implementation (like Double, Int, etc.)
  */
 case class MinMaxBounds2D[T](xBound: SingleDimMinMaxBound[T], yBound: SingleDimMinMaxBound[T])(implicit n: Numeric[T]) {
