@@ -51,6 +51,20 @@ class PersistentHomologySpec extends AnyFlatSpec with DataLoader with BeforeAndA
     assert(multisetEqual(result, expected))
   }
 
+  "getPersistencePairs(filtration)" should
+    "work with version of function with automatically determined number of partitions" in {
+    val data = sparkContext.parallelize(tetrahedron().toList)
+
+    val result =
+      PersistentHomology
+        .getPersistencePairs(data)
+        .collect()
+        .toList
+
+    val expected = tetrahedronExpectedPersistencePairs()
+    assert(multisetEqual(result, expected))
+  }
+
   "getPersistencePairs(pointsCloud)" should
     "return all finite and infinite persistence pairs for three points and maxDim=1" in {
     val data = sparkContext.parallelize(
@@ -59,7 +73,7 @@ class PersistentHomologySpec extends AnyFlatSpec with DataLoader with BeforeAndA
 
     val result =
       PersistentHomology
-        .getPersistencePairs(data, 4, Some(1))
+        .getPersistencePairs(data, Some(4), Some(1))
         .collect()
         .toList
 
@@ -79,7 +93,26 @@ class PersistentHomologySpec extends AnyFlatSpec with DataLoader with BeforeAndA
 
     val result =
       PersistentHomology
-        .getPersistencePairs(data, 4, Some(2))
+        .getPersistencePairs(data, Some(4), Some(2))
+        .collect()
+        .toList
+
+    val expected = PersistencePair(0.0, Right(Infinity), 0) ::
+      PersistencePair(0.0, Left(math.sqrt(3.0)), 0) ::
+      PersistencePair(0.0, Left(math.sqrt(3.0)), 0) ::
+      Nil
+    assert(multisetEqual(result, expected))
+  }
+
+  "getPersistencePairs(pointsCloud)" should
+    "work with version of function with automatically determined number of partitions" in {
+    val data = sparkContext.parallelize(
+      Vector(0.0, 0.0, 0.0) :: Vector(1.0, 1.0, 1.0) :: Vector(2.0, 2.0, 2.0) :: Nil
+    )
+
+    val result =
+      PersistentHomology
+        .getPersistencePairs(data, maxDim = Some(2))
         .collect()
         .toList
 

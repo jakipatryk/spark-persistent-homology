@@ -17,32 +17,47 @@ object PersistentHomology {
   /**
    * Takes a points cloud and computes all persistence pairs (including infinite ones).
    * @param pointsCloud RDD of Vectors of Doubles representing points cloud
-   * @param numOfPartitions number of partitions to use when calculating persistent homology
-   * @param filtrationCreator (default VietorisRipsFiltrationCreator)
+   * @param numOfPartitionsConf (default None) number of partitions to use when calculating persistent homology
    * @param maxDim (default None) max dimension of simplices in a filtration;
    *               dimension of a simplex = (number of points that define it) - 1
+   * @param filtrationCreator (default VietorisRipsFiltrationCreator)
    * @return All (finite and infinite) persistence pairs
    */
   def getPersistencePairs(
                            pointsCloud: PointsCloud,
-                           numOfPartitions: Int,
+                           numOfPartitionsConf: Option[Int] = None,
                            maxDim: Option[Int] = None,
                            filtrationCreator: FiltrationCreator = VietorisRipsFiltrationCreator
                          ): RDD[PersistencePair] = {
     val filtration = filtrationCreator.createFiltration(pointsCloud, maxDim)
+
+    numOfPartitionsConf match {
+      case Some(n) => getPersistencePairs(filtration, n)
+      case None => getPersistencePairs(filtration)
+    }
+  }
+
+  /**
+   * Takes a filtration and computes all persistence pairs (including infinite ones).
+   *
+   * @param filtration RDD representing filtration
+   * @return All (finite and infinite) persistence pairs
+   */
+  def getPersistencePairs(filtration: Filtration): RDD[PersistencePair] = {
+    val defaultPartitioner = Partitioner.defaultPartitioner(filtration)
+    val numOfPartitions = defaultPartitioner.numPartitions
+
     getPersistencePairs(filtration, numOfPartitions)
   }
 
   /**
    * Takes a filtration and computes all persistence pairs (including infinite ones).
+   *
    * @param filtration RDD representing filtration
    * @param numOfPartitions number of partitions to use when calculating persistent homology
    * @return All (finite and infinite) persistence pairs
    */
-  def getPersistencePairs(
-                           filtration: Filtration,
-                           numOfPartitions: Int
-                         ): RDD[PersistencePair] = {
+  def getPersistencePairs(filtration: Filtration, numOfPartitions: Int): RDD[PersistencePair] = {
     filtration.cache()
     val filtrationLength = filtration.count()
     val (boundaryMatrix, mapping) = filtrationToBoundaryMatrixAndThresholdMapping(filtration)
