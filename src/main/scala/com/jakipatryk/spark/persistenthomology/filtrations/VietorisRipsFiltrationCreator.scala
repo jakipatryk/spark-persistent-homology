@@ -12,11 +12,11 @@ object VietorisRipsFiltrationCreator extends FiltrationCreator {
                                  maxDim: Option[Int] = None,
                                  distanceCalculator: DistanceCalculator = EuclideanDistanceCalculator
                                ): Filtration = {
-    val maxNumberOfPointsInSimplex = maxDim.getOrElse(pointsCloud.first().length - 1) + 1
+    val maxNumberOfPointsInSimplex = maxDim.getOrElse(pointsCloud.rdd.first().length - 1) + 1
 
     val pointsDefiningBoundaryRDD = CombinatorialUtils
       .computeForAllCombinationsUpToN(
-        pointsCloud, maxNumberOfPointsInSimplex, computeThreshold(distanceCalculator)
+        pointsCloud.rdd, maxNumberOfPointsInSimplex, computeThreshold(distanceCalculator)
       )
       .sortBy { case (initThreshold, points) => (initThreshold, points.length) }
       .zipWithIndex()
@@ -25,7 +25,9 @@ object VietorisRipsFiltrationCreator extends FiltrationCreator {
           (pointsDefiningBoundary, (index, initThreshold))
       }
 
-    pointsDefiningSimplexToBoundaryChain(pointsDefiningBoundaryRDD)
+    Filtration(
+      pointsDefiningSimplexToBoundaryChain(pointsDefiningBoundaryRDD)
+    )
   }
 
   private[this] def computeThreshold(distanceCalculator: DistanceCalculator)
@@ -42,7 +44,7 @@ object VietorisRipsFiltrationCreator extends FiltrationCreator {
 
   private[this] def pointsDefiningSimplexToBoundaryChain(
                                                           pointsRDD: RDD[(List[Long], (Long, Double))]
-                                                        ): RDD[(Long, Double, Chain)] = {
+                                                        ): RDD[(IndexInMatrix, InitThreshold, SimplexBoundary)] = {
     val boundariesDefinedByPoints = pointsRDD.flatMap {
       case (points, (index, threshold)) =>
         val dim = points.length
@@ -60,12 +62,23 @@ object VietorisRipsFiltrationCreator extends FiltrationCreator {
       .groupByKey()
       .map {
         case ((index, threshold), boundary) =>
-          (index, threshold, Chain(boundary.toList.sorted(Ordering[Long].reverse)))
+          (
+            IndexInMatrix(index),
+            InitThreshold(threshold),
+            SimplexBoundary(Chain(boundary.toList.sorted(Ordering[Long].reverse)))
+          )
       }
       .union(
         boundariesDefinedByPoints
           .filter(_._1.isEmpty)
-          .map { case (l, (i, t)) => (i, t, Chain(l)) }
+          .map {
+            case (l, (i, t)) =>
+              (
+                IndexInMatrix(i),
+                InitThreshold(t),
+                SimplexBoundary(Chain(l))
+              )
+          }
       )
   }
 

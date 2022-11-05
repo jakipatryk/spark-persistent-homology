@@ -1,6 +1,7 @@
 package com.jakipatryk.spark.persistenthomology
 
 import com.jakipatryk.spark.persistenthomology.PersistentHomology.PersistenceIndicesPair
+import com.jakipatryk.spark.persistenthomology.filtrations.{Filtration, PointsCloud}
 import org.apache.spark.{SparkConf, SparkContext}
 import org.scalatest.BeforeAndAfterAll
 import org.scalatest.flatspec.AnyFlatSpec
@@ -25,10 +26,11 @@ class PersistentHomologySpec extends AnyFlatSpec with DataLoader with BeforeAndA
 
   "getPersistencePairs(filtration)" should "return all finite and infinite persistence pairs for 10 triangles" in {
     val data = sparkContext.parallelize(nSeparateTriangles(10).toList)
+    val filtration = Filtration(data)
 
     val result =
       PersistentHomology
-        .getPersistencePairs(data, 8)
+        .getPersistencePairs(filtration, 8)
         .collect()
         .toList
 
@@ -40,10 +42,11 @@ class PersistentHomologySpec extends AnyFlatSpec with DataLoader with BeforeAndA
   "getPersistencePairs(filtration)" should
     "return all finite and infinite persistence pairs for tetrahedron" in {
     val data = sparkContext.parallelize(tetrahedron().toList)
+    val filtration = Filtration(data)
 
     val result =
       PersistentHomology
-        .getPersistencePairs(data, 4)
+        .getPersistencePairs(filtration, 4)
         .collect()
         .toList
 
@@ -54,10 +57,11 @@ class PersistentHomologySpec extends AnyFlatSpec with DataLoader with BeforeAndA
   "getPersistencePairs(filtration)" should
     "work with version of function with automatically determined number of partitions" in {
     val data = sparkContext.parallelize(tetrahedron().toList)
+    val filtration = Filtration(data)
 
     val result =
       PersistentHomology
-        .getPersistencePairs(data)
+        .getPersistencePairs(filtration)
         .collect()
         .toList
 
@@ -70,10 +74,11 @@ class PersistentHomologySpec extends AnyFlatSpec with DataLoader with BeforeAndA
     val data = sparkContext.parallelize(
       Vector(0.0, 0.0, 0.0) :: Vector(1.0, 1.0, 1.0) :: Vector(2.0, 2.0, 2.0) :: Nil
     )
+    val pointsCloud = PointsCloud(data)
 
     val result =
       PersistentHomology
-        .getPersistencePairs(data, Some(4), Some(1))
+        .getPersistencePairs(pointsCloud, Some(4), Some(1))
         .collect()
         .toList
 
@@ -90,10 +95,11 @@ class PersistentHomologySpec extends AnyFlatSpec with DataLoader with BeforeAndA
     val data = sparkContext.parallelize(
       Vector(0.0, 0.0, 0.0) :: Vector(1.0, 1.0, 1.0) :: Vector(2.0, 2.0, 2.0) :: Nil
     )
+    val pointsCloud = PointsCloud(data)
 
     val result =
       PersistentHomology
-        .getPersistencePairs(data, Some(4), Some(2))
+        .getPersistencePairs(pointsCloud, Some(4), Some(2))
         .collect()
         .toList
 
@@ -109,10 +115,11 @@ class PersistentHomologySpec extends AnyFlatSpec with DataLoader with BeforeAndA
     val data = sparkContext.parallelize(
       Vector(0.0, 0.0, 0.0) :: Vector(1.0, 1.0, 1.0) :: Vector(2.0, 2.0, 2.0) :: Nil
     )
+    val pointsCloud = PointsCloud(data)
 
     val result =
       PersistentHomology
-        .getPersistencePairs(data, maxDim = Some(2))
+        .getPersistencePairs(pointsCloud, maxDim = Some(2))
         .collect()
         .toList
 

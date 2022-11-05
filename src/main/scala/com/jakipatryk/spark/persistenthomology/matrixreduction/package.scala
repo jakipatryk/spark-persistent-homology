@@ -4,6 +4,6 @@ import org.apache.spark.rdd.RDD
 
 package object matrixreduction {
 
-  type BoundaryMatrix = RDD[(Key, Chain)]
+  case class BoundaryMatrix(rdd: RDD[(Key, Chain)]) extends AnyVal
 
 }

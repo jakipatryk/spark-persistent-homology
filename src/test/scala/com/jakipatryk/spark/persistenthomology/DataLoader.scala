@@ -6,7 +6,7 @@ import com.jakipatryk.spark.persistenthomology.utils.Empty
 trait DataLoader {
 
   def nSeparateTriangles(n: Int): Iterator[(IndexInMatrix, InitThreshold, SimplexBoundary)] =
-    (Range(0, 3 * n) map (i => (i toLong, 0.0, Chain(Empty)))).iterator ++
+    ((Range(0, 3 * n) map (i => (i toLong, 0.0, Chain(Empty)))).iterator ++
       (Range(3 * n, 4 * n) map {
         i => (
           i toLong,
@@ -34,7 +34,10 @@ trait DataLoader {
           4.0,
           Chain((((i - 6 * n) + 3 * n + 2 * n) toLong) :: (((i - 6 * n) + 3 * n + n) toLong) :: (((i - 6 * n) + 3 * n) toLong)  :: Nil)
         )
-      }).iterator
+      }).iterator).map {
+        case (index, threshold, boundary) =>
+          (IndexInMatrix(index), InitThreshold(threshold), SimplexBoundary(boundary))
+      }
 
   def nSeparateTrianglesExpectedPersistencePairs(n: Int): List[PersistencePair] = {
     val infiniteConnectedComponents = ((0 until n) map { i => PersistencePair(0.0, Right(Infinity), 0) }).toList
@@ -47,7 +50,7 @@ trait DataLoader {
   }
 
   def tetrahedron(): Iterator[(IndexInMatrix, InitThreshold, SimplexBoundary)] = {
-    (Range(0, 4) map (i => (i toLong, 0.0, Chain(Empty)))).iterator ++
+    ((Range(0, 4) map (i => (i toLong, 0.0, Chain(Empty)))).iterator ++
       ((4L, 1.0, Chain(1L :: 0L :: Nil))
         :: (5L, 1.0, Chain(2L :: 1L :: Nil))
         :: (6L, 1.0, Chain(3L :: 2L :: Nil))
@@ -59,7 +62,10 @@ trait DataLoader {
         :: (12L, 4.0, Chain(8L :: 7L :: 6L :: Nil))
         :: (13L, 5.0, Chain(7L :: 5L :: 4L :: Nil))
         :: (14L, 10.0, Chain(13L :: 12L :: 11L :: 10L :: Nil))
-        :: Nil).toIterator
+        :: Nil).toIterator).map {
+      case (index, threshold, boundary) =>
+        (IndexInMatrix(index), InitThreshold(threshold), SimplexBoundary(boundary))
+    }
   }
 
   def tetrahedronExpectedPersistencePairs(): List[PersistencePair] = {
