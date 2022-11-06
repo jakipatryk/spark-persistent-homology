@@ -1,7 +1,7 @@
 package com.jakipatryk.spark.persistenthomology.matrixreduction
 
 import com.jakipatryk.spark.persistenthomology.utils.Empty
-import com.jakipatryk.spark.persistenthomology.{Chain, DataLoader, Key}
+import com.jakipatryk.spark.persistenthomology.{Chain, Key}
 import org.apache.spark.{SparkConf, SparkContext}
 import org.scalatest.BeforeAndAfterAll
 import org.scalatest.flatspec.AnyFlatSpec
@@ -74,11 +74,13 @@ class BoundaryMatrixReductionSpec extends AnyFlatSpec with DataLoader with Befor
 
   "reduceBoundaryMatrix" should "reduce boundary matrix of 10 triangles with 3 partitions correctly" in {
     val data = sparkContext.parallelize(nSeparateTriangles(10).toList)
+    val boundaryMatrix = BoundaryMatrix(data)
     val filtrationLength = data.count()
 
     val result =
       BoundaryMatrixReduction
-        .reduceBoundaryMatrix(data, 3, filtrationLength)
+        .reduceBoundaryMatrix(boundaryMatrix, 3, filtrationLength)
+        .rdd
         .collect()
         .toList
         .sortBy { case (k, _) => k.indexInMatrix }
@@ -88,11 +90,13 @@ class BoundaryMatrixReductionSpec extends AnyFlatSpec with DataLoader with Befor
 
   "reduceBoundaryMatrix" should "reduce boundary matrix of 10 triangles with 8 partitions correctly" in {
     val data = sparkContext.parallelize(nSeparateTriangles(10).toList)
+    val boundaryMatrix = BoundaryMatrix(data)
     val filtrationLength = data.count()
 
     val result =
       BoundaryMatrixReduction
-        .reduceBoundaryMatrix(data, 8, filtrationLength)
+        .reduceBoundaryMatrix(boundaryMatrix, 8, filtrationLength)
+        .rdd
         .collect()
         .toList
         .sortBy { case (k, _) => k.indexInMatrix }

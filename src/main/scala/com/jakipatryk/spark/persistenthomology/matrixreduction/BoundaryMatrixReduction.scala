@@ -58,6 +58,7 @@ object BoundaryMatrixReduction {
     implicit val keyOrdering: Ordering[Key] = Ordering.by[Key, Long](_.indexInMatrix)
 
     var reducedMatrix = boundaryMatrix
+      .rdd
       .filter { case (k, _) => k.pivot.nonEmpty }
       .repartitionAndSortWithinPartitions(partitioner)
 
@@ -82,7 +83,7 @@ object BoundaryMatrixReduction {
         .repartitionAndSortWithinPartitions(partitioner)
     }
 
-    reducedMatrix
+    BoundaryMatrix(reducedMatrix)
   }
 
 }

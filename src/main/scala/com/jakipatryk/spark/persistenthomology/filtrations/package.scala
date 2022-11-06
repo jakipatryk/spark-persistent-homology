@@ -4,23 +4,23 @@ import org.apache.spark.rdd.RDD
 
 package object filtrations {
 
-  type InitThreshold = Double
+  /** Represents index in boundary matrix of simplex in filtration. */
+  case class IndexInMatrix(index: Long) extends AnyVal
 
-  type SimplexBoundary = Chain
+  /** Represents threshold when simplex appears in filtration. */
+  case class InitThreshold(threshold: Double) extends AnyVal
 
-  type IndexInMatrix = Long
+  /** Represents boundary of simplex. */
+  case class SimplexBoundary(boundary: Chain) extends AnyVal
 
   /**
-   * Type alias for filtration.
+   * Represents filtration (a sequence of simplices such that any prefix of it is a simplicial complex).
    * Simplex boundary is with respect to indices of these simplices in boundary matrix.
    * IMPORTANT: Filtration is expected to be sorted by (InitThreshold, DimOfSimplex),
    *            thus Filtration is ready to be converted to boundary matrix.
    */
-  type Filtration = RDD[(IndexInMatrix, InitThreshold, SimplexBoundary)]
+  case class Filtration(rdd: RDD[(IndexInMatrix, InitThreshold, SimplexBoundary)]) extends AnyVal
 
-  /**
-   * Type alias for points cloud.
-   */
-  type PointsCloud = RDD[Vector[Double]]
+  case class PointsCloud(rdd: RDD[Vector[Double]]) extends AnyVal
 
 }

@@ -1,7 +1,13 @@
 package com.jakipatryk.spark.persistenthomology
 
 import com.jakipatryk.spark.persistenthomology.filtrations.{
-  Filtration, FiltrationCreator, PointsCloud, VietorisRipsFiltrationCreator
+  Filtration,
+  FiltrationCreator,
+  IndexInMatrix,
+  InitThreshold,
+  PointsCloud,
+  SimplexBoundary,
+  VietorisRipsFiltrationCreator
 }
 import com.jakipatryk.spark.persistenthomology.matrixreduction.{BoundaryMatrix, BoundaryMatrixReduction}
 import org.apache.spark.Partitioner
@@ -44,7 +50,7 @@ object PersistentHomology {
    * @return All (finite and infinite) persistence pairs
    */
   def getPersistencePairs(filtration: Filtration): RDD[PersistencePair] = {
-    val defaultPartitioner = Partitioner.defaultPartitioner(filtration)
+    val defaultPartitioner = Partitioner.defaultPartitioner(filtration.rdd)
     val numOfPartitions = defaultPartitioner.numPartitions
 
     getPersistencePairs(filtration, numOfPartitions)
@@ -58,14 +64,14 @@ object PersistentHomology {
    * @return All (finite and infinite) persistence pairs
    */
   def getPersistencePairs(filtration: Filtration, numOfPartitions: Int): RDD[PersistencePair] = {
-    filtration.cache()
-    val filtrationLength = filtration.count()
+    filtration.rdd.cache()
+    val filtrationLength = filtration.rdd.count()
     val (boundaryMatrix, mapping) = filtrationToBoundaryMatrixAndThresholdMapping(filtration)
 
     val reducedMatrix = BoundaryMatrixReduction
       .reduceBoundaryMatrix(boundaryMatrix, numOfPartitions, filtrationLength)
 
-    val finiteIndicesPairs = reducedMatrix map {
+    val finiteIndicesPairs = reducedMatrix.rdd.map {
       case (Key(indexInMatrix, Some(pivot)), _) => PersistenceIndicesPair(pivot, Left(indexInMatrix))
     }
     val infiniteIndicesPairs = getInfinitePairs(
@@ -88,12 +94,14 @@ object PersistentHomology {
                                                      filtration: Filtration
                                                    ): (BoundaryMatrix, RDD[(Long, (Double, Int))]) = {
     val boundaryMatrix = filtration
-      .map { case (index, _, boundary) => (Key(index, boundary.pivot), boundary) }
+      .rdd
+      .map { case (IndexInMatrix(index), _, SimplexBoundary(boundary)) => (Key(index, boundary.pivot), boundary) }
     val mapping = filtration
-      .map { case (index, threshold, boundary) =>
+      .rdd
+      .map { case (IndexInMatrix(index), InitThreshold(threshold), SimplexBoundary(boundary)) =>
         (index, (threshold, boundary.asVector.indicesOfOnes.length match { case 0 => 0 case d => d - 1 }))
       }
-    (boundaryMatrix, mapping)
+    (BoundaryMatrix(boundaryMatrix), mapping)
   }
 
   private[this] class IndicesPartitioner(
