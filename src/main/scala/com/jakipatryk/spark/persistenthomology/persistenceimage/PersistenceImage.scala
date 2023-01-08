@@ -8,6 +8,8 @@ import com.jakipatryk.spark.persistenthomology.persistenceimage.InfluenceDistrib
 import com.jakipatryk.spark.persistenthomology.utils.{IntegrationOverRectangle, MinMaxBounds2D, SingleDimMinMaxBound}
 import org.apache.spark.rdd.RDD
 
+import scala.util.{Failure, Success, Try}
+
 /**
  * Represents bounds of an image for a given dim.
  * If any of them is None, its value is calculated based of min/max values
@@ -81,57 +83,78 @@ object PersistenceImage {
                             influenceDistribution: InfluenceDistribution,
                             weightingFunction: (Birth, Persistence) => Weight = (_, p) => Weight(p.value),
                             monteCarloIntegrationSamplesPerPixel: Int = 5
-                          ): PersistenceImage = {
-    val finitePersistencePairs = persistencePairs.filter(_.death.isLeft)
-    val onlyNeededDims = finitePersistencePairs.filter(dimensionsToInclude contains _.dim)
-    val birthPersistencePairs = onlyNeededDims
-      .map(p => (p.dim, (Birth(p.birth), Persistence(p.death.left.get - p.birth))))
+                          ): Try[PersistenceImage] = {
+    val isConfigValid = validateDimensionsConfig(dimensionsToInclude)
+    isConfigValid.flatMap { _ =>
+      val finitePersistencePairs = persistencePairs.filter(_.death.isLeft)
+      val onlyNeededDims = finitePersistencePairs.filter(dimensionsToInclude contains _.dim)
+      val birthPersistencePairs = onlyNeededDims
+        .map(p => (p.dim, (Birth(p.birth), Persistence(p.death.left.get - p.birth))))
 
-    val pixelSizesAndBoundsPerDim = calculatePixelSizesPerDim(
-      birthPersistencePairs, numberOfPixelsOnBirthAxisPerDim, numberOfPixelsOnPersistenceAxis, dimensionsToInclude
-    )
-
-    val dimsSorted = dimensionsToInclude.keys.toVector.sorted.zipWithIndex.toMap
-
-    val initialImage = Array.fill(numberOfPixelsOnBirthAxisPerDim * dimensionsToInclude.size)(
-        Array.fill(numberOfPixelsOnPersistenceAxis)(0.0D)
-    )
-
-    val image = birthPersistencePairs.aggregate(initialImage)(
-        { case (currentImage, (dim, (birth, persistence))) =>
-          val (birthAxisPixelSize, persistenceAxisPixelSize, _) =  pixelSizesAndBoundsPerDim(dim)
-          val dimIndex = dimsSorted(dim)
-          for(
-            i <- dimIndex * numberOfPixelsOnBirthAxisPerDim until (dimIndex + 1) * numberOfPixelsOnBirthAxisPerDim;
-            j <- 0 until numberOfPixelsOnPersistenceAxis
-          ) {
-            val pixelBottomLeftRelativeCoordinates = (
-              (i - dimIndex * numberOfPixelsOnBirthAxisPerDim) * birthAxisPixelSize.value,
-              j * persistenceAxisPixelSize.value
-            )
-            val integralOnlyInfluencedByThisPair = IntegrationOverRectangle.computeMonteCarloIntegral(
-              (x, y) => influenceDistribution.compute((birth.value, persistence.value), (x, y)),
-              pixelBottomLeftRelativeCoordinates,
-              birthAxisPixelSize.value,
-              persistenceAxisPixelSize.value,
-              monteCarloIntegrationSamplesPerPixel
-            )
-            currentImage(i)(j) += weightingFunction(birth, persistence).value * integralOnlyInfluencedByThisPair
-          }
-          currentImage
-        },
-        { case (partialImage1, partialImage2) =>
-          for(
-            i <- 0 until numberOfPixelsOnBirthAxisPerDim * dimsSorted.size;
-            j <- 0 until numberOfPixelsOnPersistenceAxis
-          )
-            partialImage1(i)(j) += partialImage2(i)(j)
-          partialImage1
-        }
+      val pixelSizesAndBoundsPerDim = calculatePixelSizesPerDim(
+        birthPersistencePairs, numberOfPixelsOnBirthAxisPerDim, numberOfPixelsOnPersistenceAxis, dimensionsToInclude
       )
+      val illegalBoundsErrors = pixelSizesAndBoundsPerDim.foldLeft(Seq.empty[String]) {
+        case (errors, (dim, (birthAxisPixelSize, persistenceAxisPixelSize, _))) =>
+          errors ++
+            (if(birthAxisPixelSize.value <= 0)
+              Seq(s"Calculated pixel size on birth axis for dim $dim is incorrect. " +
+                  s"Please specify it by hand in config.")
+            else Seq.empty[String]) ++
+            (if (persistenceAxisPixelSize.value <= 0)
+              Seq(s"Calculated pixel size on persistence axis for dim $dim is incorrect. " +
+                s"Please specify it by hand in config.")
+            else Seq.empty[String])
+      }
 
-    val imageAsVector = image.toVector.map(_.toVector)
-    PersistenceImage(imageAsVector, pixelSizesAndBoundsPerDim.mapValues { case (_, _, bounds) => bounds })
+      if(illegalBoundsErrors.isEmpty) {
+        val dimsSorted = dimensionsToInclude.keys.toVector.sorted.zipWithIndex.toMap
+
+        val initialImage = Array.fill(numberOfPixelsOnBirthAxisPerDim * dimensionsToInclude.size)(
+          Array.fill(numberOfPixelsOnPersistenceAxis)(0.0D)
+        )
+
+        val image = birthPersistencePairs.aggregate(initialImage)(
+          { case (currentImage, (dim, (birth, persistence))) =>
+            val (birthAxisPixelSize, persistenceAxisPixelSize, _) = pixelSizesAndBoundsPerDim(dim)
+            val dimIndex = dimsSorted(dim)
+            for (
+              i <- dimIndex * numberOfPixelsOnBirthAxisPerDim until (dimIndex + 1) * numberOfPixelsOnBirthAxisPerDim;
+              j <- 0 until numberOfPixelsOnPersistenceAxis
+            ) {
+              val pixelBottomLeftRelativeCoordinates = (
+                (i - dimIndex * numberOfPixelsOnBirthAxisPerDim) * birthAxisPixelSize.value,
+                j * persistenceAxisPixelSize.value
+              )
+              val integralOnlyInfluencedByThisPair = IntegrationOverRectangle.computeMonteCarloIntegral(
+                (x, y) => influenceDistribution.compute((birth.value, persistence.value), (x, y)),
+                pixelBottomLeftRelativeCoordinates,
+                birthAxisPixelSize.value,
+                persistenceAxisPixelSize.value,
+                monteCarloIntegrationSamplesPerPixel
+              )
+              currentImage(i)(j) += weightingFunction(birth, persistence).value * integralOnlyInfluencedByThisPair
+            }
+            currentImage
+          },
+          { case (partialImage1, partialImage2) =>
+            for (
+              i <- 0 until numberOfPixelsOnBirthAxisPerDim * dimsSorted.size;
+              j <- 0 until numberOfPixelsOnPersistenceAxis
+            )
+              partialImage1(i)(j) += partialImage2(i)(j)
+            partialImage1
+          }
+        )
+
+        val imageAsVector = image.toVector.map(_.toVector)
+        val persistenceImage = PersistenceImage(
+          imageAsVector,
+          pixelSizesAndBoundsPerDim.mapValues { case (_, _, bounds) => bounds }
+        )
+        Success(persistenceImage)
+      } else Failure(new IllegalStateException(illegalBoundsErrors.mkString(" ")))
+    }
   }
 
   /**
@@ -145,7 +168,7 @@ object PersistenceImage {
                                     numberOfPixelsOnPersistenceAxis: Int,
                                     varianceBirthAxis: Double,
                                     variancePersistenceAxis: Double
-                                  ): PersistenceImage =
+                                  ): Try[PersistenceImage] =
     fromPersistencePairs(
       persistencePairs,
       dimensionsToInclude,
@@ -164,7 +187,7 @@ object PersistenceImage {
                                     numberOfPixelsOnBirthAxisPerDim: Int,
                                     numberOfPixelsOnPersistenceAxis: Int,
                                     variance: Double
-                                  ): PersistenceImage =
+                                  ): Try[PersistenceImage] =
     fromPersistencePairsGaussian(
       persistencePairs,
       dimensionsToInclude,
@@ -174,10 +197,11 @@ object PersistenceImage {
       variance
     )
 
-  private[persistenceimage] def calculatePixelSizesPerDim(birthPersistencePairs: RDD[(Int, (Birth, Persistence))],
-                                                          numberOfPixelsOnBirthAxisPerDim: Int,
-                                                          numberOfPixelsOnPersistenceAxis: Int,
-                                                          dimensions: Map[Int, BirthAndPersistenceBoundsConfig])
+  private[persistenceimage] def calculatePixelSizesPerDim(
+                                                           birthPersistencePairs: RDD[(Int, (Birth, Persistence))],
+                                                           numberOfPixelsOnBirthAxisPerDim: Int,
+                                                           numberOfPixelsOnPersistenceAxis: Int,
+                                                           dimensions: Map[Int, BirthAndPersistenceBoundsConfig])
   : Map[Int, (BirthAxisPixelSize, PersistenceAxisPixelSize, MinMaxBounds2D[Double])] = {
 
     lazy val boundsPerDimCalculated = MinMaxBounds2D.boundsPerKeyFromRDD[Int, Double](
@@ -233,6 +257,32 @@ object PersistenceImage {
           )
         )
     }
+  }
+
+  private[persistenceimage] def validateDimensionsConfig(
+                                                          dimensionsToInclude: Map[Int, BirthAndPersistenceBoundsConfig]
+                                                        ): Try[Unit] = {
+    val validationErrors = dimensionsToInclude.foldLeft(Seq.empty[String]) {
+      case (errors, (dim, config)) =>
+        val areBirthBoundsInvalid = for {
+          minBirth <- config.minBirth
+          maxBirth <- config.maxBirth
+        } yield minBirth >= maxBirth
+        val arePersistenceBoundsInvalid = for {
+          minPersistence <- config.minPersistence
+          maxPersistence <- config.maxPersistence
+        } yield minPersistence >= maxPersistence
+        errors ++
+          (if(areBirthBoundsInvalid.getOrElse(false))
+            Seq(s"Birth bounds in config of dim $dim are invalid.")
+          else Seq.empty[String]) ++
+          (if (arePersistenceBoundsInvalid.getOrElse(false))
+            Seq(s"Persistence bounds in config of dim $dim are invalid.")
+          else Seq.empty[String])
+    }
+
+    if(validationErrors.isEmpty) Success()
+    else Failure(new IllegalArgumentException(validationErrors.mkString(" ")))
   }
 
 }

@@ -10,6 +10,7 @@ import org.scalatest.BeforeAndAfterAll
 import org.scalatest.flatspec.AnyFlatSpec
 
 import scala.io.Source
+import scala.util.Failure
 
 class PersistenceImageSpec extends AnyFlatSpec with BeforeAndAfterAll {
 
@@ -78,13 +79,17 @@ class PersistenceImageSpec extends AnyFlatSpec with BeforeAndAfterAll {
         )
     )
 
-    val result = PersistenceImage.fromPersistencePairsGaussian(birthDeathPairsRDD, dimensionsToInclude , 100, 100, 1.0)
+    val result = PersistenceImage.fromPersistencePairsGaussian(
+      birthDeathPairsRDD, dimensionsToInclude , 100, 100, 1.0
+    )
+    assert(result.isSuccess)
+
     val fromScikitTDA = loadImageVectorFromFile("/persistenceimage/image-single-dim-scikit-tda.csv")
 
-    assert(result.dims == Set(0))
-    assert(result.image.size == 100)
-    assert(result.image(0).size == 100)
-    assert(imagesAlmostEqual(fromScikitTDA, result.image))
+    assert(result.get.dims === Set(0))
+    assert(result.get.image.size === 100)
+    assert(result.get.image(0).size === 100)
+    assert(imagesAlmostEqual(fromScikitTDA, result.get.image))
   }
 
   it should
@@ -100,14 +105,44 @@ class PersistenceImageSpec extends AnyFlatSpec with BeforeAndAfterAll {
         )
     )
 
-    val result = PersistenceImage
-      .fromPersistencePairsGaussian(birthDeathPairsRDD, dimensionsToInclude, 100, 100, 1.0)
+    val result = PersistenceImage.fromPersistencePairsGaussian(
+      birthDeathPairsRDD, dimensionsToInclude, 100, 100, 1.0
+    )
+    assert(result.isSuccess)
+
     val fromScikitTDA = loadImageVectorFromFile("/persistenceimage/image-multi-dim-scikit-tda.csv")
 
-    assert(result.dims == Set(0, 1))
-    assert(result.image.size == 200)
-    assert(result.image(0).size == 100)
-    assert(imagesAlmostEqual(fromScikitTDA, result.image))
+    assert(result.get.dims === Set(0, 1))
+    assert(result.get.image.size === 200)
+    assert(result.get.image(0).size === 100)
+    assert(imagesAlmostEqual(fromScikitTDA, result.get.image))
+  }
+
+  it should "return Failure when birth range of pairs is 0 and birth bounds are not specified by config" in {
+    val birthDeathPairs = Seq(
+      PersistencePair(0.0, Left(10.0), 0),
+      PersistencePair(0.0, Left(18.6), 0),
+      PersistencePair(0.0, Left(6.2), 0),
+      PersistencePair(0.0, Left(15.0), 0),
+      PersistencePair(0.0, Right(Infinity), 0)
+    )
+    val birthDeathPairsRDD = sparkContext.parallelize(birthDeathPairs)
+    val dimensionsToInclude = Map(
+      0 -> BirthAndPersistenceBoundsConfig()
+    )
+
+    val result = PersistenceImage.fromPersistencePairsGaussian(
+      birthDeathPairsRDD, dimensionsToInclude, 100, 100, 1.0
+    )
+
+    assert(result.isFailure)
+    result match {
+      case Failure(e: IllegalStateException) =>
+        val actualMessage = e.getMessage
+        val expectedMessage = "Calculated pixel size on birth axis for dim 0 is incorrect. " +
+          "Please specify it by hand in config."
+        assert(actualMessage === expectedMessage)
+    }
   }
 
 
@@ -378,6 +413,72 @@ class PersistenceImageSpec extends AnyFlatSpec with BeforeAndAfterAll {
     assert(result(2)._2 == PersistenceImage.PersistenceAxisPixelSize((10.0 - 0.4) / 75.0))
     assert(result(2)._3.xBound == SingleDimMinMaxBound[Double](1.2, 454.2))
     assert(result(2)._3.yBound == SingleDimMinMaxBound[Double](0.4, 10.0))
+  }
+
+  behavior of "validateDimensionsConfig"
+
+  it should "return Success if config has only Nones" in {
+    val dimensions = Map(
+      0 -> BirthAndPersistenceBoundsConfig(),
+      2 -> BirthAndPersistenceBoundsConfig()
+    )
+
+    val result = PersistenceImage.validateDimensionsConfig(dimensions)
+
+    assert(result.isSuccess)
+  }
+
+  it should "return Success if config has value for one of min xor max" in {
+    val dimensions = Map(
+      0 -> BirthAndPersistenceBoundsConfig(minBirth = Some(1.0), maxPersistence = Some(11.0)),
+      2 -> BirthAndPersistenceBoundsConfig(maxBirth = Some(11.1), minPersistence = Some(0.0))
+    )
+
+    val result = PersistenceImage.validateDimensionsConfig(dimensions)
+
+    assert(result.isSuccess)
+  }
+
+  it should "return Success if config has all values that are mutually correct" in {
+    val dimensions = Map(
+      0 -> BirthAndPersistenceBoundsConfig(
+        minBirth = Some(1.0), maxBirth = Some(10.0), minPersistence = Some(9.0), maxPersistence = Some(11.0)
+      ),
+      2 -> BirthAndPersistenceBoundsConfig(
+        minBirth = Some(0.0), maxBirth = Some(0.1), minPersistence = Some(10.0), maxPersistence = Some(11.0)
+      )
+    )
+
+    val result = PersistenceImage.validateDimensionsConfig(dimensions)
+
+    assert(result.isSuccess)
+  }
+
+  it should "return Failure with correct message if config has all values that are mutually incorrect" in {
+    val dimensions = Map(
+      0 -> BirthAndPersistenceBoundsConfig(
+        minBirth = Some(1.0), maxBirth = Some(0.0), minPersistence = Some(9.0), maxPersistence = Some(11.0)
+      ),
+      2 -> BirthAndPersistenceBoundsConfig(
+        minBirth = Some(0.0), maxBirth = Some(0.1), minPersistence = Some(999.0), maxPersistence = Some(11.0)
+      ),
+      5 -> BirthAndPersistenceBoundsConfig(
+        minBirth = Some(0.6), maxBirth = Some(0.1), minPersistence = Some(99.0), maxPersistence = Some(11.0)
+      )
+    )
+
+    val result = PersistenceImage.validateDimensionsConfig(dimensions)
+
+    assert(result.isFailure)
+    result match {
+      case Failure(e: IllegalArgumentException) =>
+        val actualMessage = e.getMessage
+        val expectedMessage = "Birth bounds in config of dim 0 are invalid. " +
+          "Persistence bounds in config of dim 2 are invalid. " +
+          "Birth bounds in config of dim 5 are invalid. " +
+          "Persistence bounds in config of dim 5 are invalid."
+        assert(actualMessage === expectedMessage)
+    }
   }
 
 }
