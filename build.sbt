@@ -1,3 +1,17 @@
+inThisBuild(List(
+  organization := "io.github.jakipatryk",
+  homepage := Some(url("https://github.com/jakipatryk/spark-persistent-homology")),
+  licenses := List("Apache-2.0" -> url("http://www.apache.org/licenses/LICENSE-2.0")),
+  developers := List(
+    Developer(
+      "jakipatryk",
+      "Bartłomiej Baj",
+      "bajbartlomiej997@gmail.com",
+      url("https://github.com/jakipatryk")
+    )
+  )
+))
+
 name := "spark-persistent-homology"
 
 version := "1.0.0-SNAPSHOT"
