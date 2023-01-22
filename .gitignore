@@ -3,3 +3,8 @@
 /project/target/
 /.idea/
 /.bsp/
+/examples/*/target/
+/examples/*/project/project/
+/examples/*/project/target/
+/examples/*/.idea/
+/examples/*/.bsp/
