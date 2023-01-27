@@ -8,7 +8,7 @@ import scala.util.{Failure, Random, Success}
 case class Config(
                    numberOfPoints: Int = 50,
                    dim: Int = 8,
-                   maxHomologyDim: Int = 3,
+                   maxSimplicesDim: Int = 3,
                    computePersistenceImage: Boolean = false,
                    numberOfPartitions: Option[Int] = None
                  )
@@ -29,9 +29,9 @@ object Config {
       opt[Int]('d', "dim")
         .action((d, c) => c.copy(dim = d))
         .text("dimension of points in the generated random points cloud"),
-      opt[Int]("maxHomologyDim")
-        .action((maxDim, c) => c.copy(maxHomologyDim = maxDim))
-        .text("max dimension of homology classes"),
+      opt[Int]("maxSimplicesDim")
+        .action((maxDim, c) => c.copy(maxSimplicesDim = maxDim))
+        .text("max dimension of simplices in Vietoris-Rips filtration of the generated points cloud"),
       opt[Boolean] ("computePersistenceImage")
         .action((computePersistenceImage, c) => c.copy(computePersistenceImage = computePersistenceImage))
         .text("should the last step of the job be persistence image or just persistence pairs"),
