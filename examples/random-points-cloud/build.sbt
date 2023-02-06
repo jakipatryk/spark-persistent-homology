@@ -8,5 +8,5 @@ lazy val root = (project in file("."))
   )
 
 libraryDependencies += "org.apache.spark" %% "spark-core" % "3.1.1" % "provided"
-libraryDependencies += "io.github.jakipatryk" %% "spark-persistent-homology" % "1.0.0-SNAPSHOT"
+libraryDependencies += "io.github.jakipatryk" %% "spark-persistent-homology" % "0.1.0-SNAPSHOT"
 libraryDependencies += "com.github.scopt" %% "scopt" % "4.0.1"
