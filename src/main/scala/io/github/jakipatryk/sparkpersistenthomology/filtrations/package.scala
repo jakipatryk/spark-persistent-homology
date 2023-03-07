@@ -21,6 +21,4 @@ package object filtrations {
    */
   case class Filtration(rdd: RDD[(IndexInMatrix, InitThreshold, SimplexBoundary)]) extends AnyVal
 
-  case class PointsCloud(rdd: RDD[Vector[Double]]) extends AnyVal
-
 }

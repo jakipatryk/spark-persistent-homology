@@ -1,14 +1,14 @@
 package io.github.jakipatryk.sparkpersistenthomology
 
 import io.github.jakipatryk.sparkpersistenthomology.PersistentHomology.PersistenceIndicesPair
-import io.github.jakipatryk.sparkpersistenthomology.filtrations.{Filtration, PointsCloud}
+import io.github.jakipatryk.sparkpersistenthomology.filtrations.Filtration
 import org.apache.spark.{SparkConf, SparkContext}
 import org.scalatest.BeforeAndAfterAll
 import org.scalatest.flatspec.AnyFlatSpec
 
 class PersistentHomologySpec extends AnyFlatSpec with DataLoader with BeforeAndAfterAll {
 
-  var sparkContext: SparkContext = _
+  implicit var sparkContext: SparkContext = _
 
   override def beforeAll(): Unit = {
     sparkContext = new SparkContext(
