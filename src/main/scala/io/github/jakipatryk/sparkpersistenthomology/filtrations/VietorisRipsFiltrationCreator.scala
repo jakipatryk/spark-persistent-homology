@@ -1,9 +1,10 @@
 package io.github.jakipatryk.sparkpersistenthomology.filtrations
 
-import io.github.jakipatryk.sparkpersistenthomology.Chain
-import io.github.jakipatryk.sparkpersistenthomology.distances.{DistanceCalculator, EuclideanDistanceCalculator}
-import io.github.jakipatryk.sparkpersistenthomology.utils.CombinatorialUtils
-import io.github.jakipatryk.sparkpersistenthomology.distances.EuclideanDistanceCalculator
+import io.github.jakipatryk.sparkpersistenthomology.distances.DistanceCalculator.EuclideanDistanceCalculator
+import io.github.jakipatryk.sparkpersistenthomology.{Chain, PointsCloud}
+import io.github.jakipatryk.sparkpersistenthomology.distances.{DistanceCalculator, DistanceMatrix}
+import io.github.jakipatryk.sparkpersistenthomology.utils.CombinatorialNumberSystemOnSteroids
+import org.apache.spark.SparkContext
 import org.apache.spark.rdd.RDD
 
 object VietorisRipsFiltrationCreator extends FiltrationCreator {
@@ -12,36 +13,51 @@ object VietorisRipsFiltrationCreator extends FiltrationCreator {
                                  pointsCloud: PointsCloud,
                                  maxDim: Option[Int] = None,
                                  distanceCalculator: DistanceCalculator = EuclideanDistanceCalculator
-                               ): Filtration = {
-    val maxNumberOfPointsInSimplex = maxDim.getOrElse(pointsCloud.rdd.first().length - 1) + 1
+                               )(implicit sparkContext: SparkContext): Filtration = {
 
-    val pointsDefiningBoundaryRDD = CombinatorialUtils
-      .computeForAllCombinationsUpToN(
-        pointsCloud.rdd, maxNumberOfPointsInSimplex, computeThreshold(distanceCalculator)
-      )
-      .sortBy { case (initThreshold, points) => (initThreshold, points.length) }
-      .zipWithIndex()
-      .map {
-        case ((initThreshold, pointsDefiningBoundary), index) =>
-          (pointsDefiningBoundary, (index, initThreshold))
+    val distanceMatrix = DistanceMatrix.fromPointsCloud(pointsCloud)
+    val distanceMatrixBroadcasted = sparkContext.broadcast(distanceMatrix)
+
+    val system = new CombinatorialNumberSystemOnSteroids(
+      pointsCloud.rdd.count().toInt,
+      maxDim.getOrElse(pointsCloud.rdd.collect().head.length - 1) + 1
+    )
+    val systemBroadcasted = sparkContext.broadcast(system)
+
+    val range = sparkContext.range(0, system.allCombinationsCount)
+    val initAndPoints = range.mapPartitions(
+      it => {
+        if(it.hasNext) {
+          val startIndex = it.next()
+          val combinationsIterator = systemBroadcasted.value.combinationsIterator(startIndex)
+          val itRecovered = Iterator.single(startIndex) ++ it
+          itRecovered.zip(combinationsIterator).map {
+            case (_, combination) => combination.length match {
+              case 1 =>
+                (0.0, combination.toList.map(_.toLong))
+              case _ =>
+                (
+                  combination.combinations(2).map(a => distanceMatrixBroadcasted.value.getDistance(a(0), a(1))).max,
+                  combination.toList.map(_.toLong)
+                )
+            }
+          }
+        } else Iterator.empty
       }
+    )
+
+    val pointsDefiningBoundaryRDD = initAndPoints
+      .sortBy { case (initThreshold, points) => (initThreshold, points.length) }
+        .zipWithIndex()
+        .map {
+          case ((initThreshold, pointsDefiningBoundary), index) =>
+            (pointsDefiningBoundary, (index, initThreshold))
+        }
 
     Filtration(
       pointsDefiningSimplexToBoundaryChain(pointsDefiningBoundaryRDD)
     )
   }
-
-  private[this] def computeThreshold(distanceCalculator: DistanceCalculator)
-                                                  (combination: List[(Vector[Double], Long)]): Double =
-    combination match {
-      case _ :: Nil => 0.0
-      case _ =>
-        val vectors = combination.map { case (v, _) => v }
-        vectors
-          .combinations(2)
-          .map { case v1 :: v2 :: Nil => distanceCalculator.calculateDistance(v1, v2) }
-          .max
-    }
 
   private[this] def pointsDefiningSimplexToBoundaryChain(
                                                           pointsRDD: RDD[(List[Long], (Long, Double))]

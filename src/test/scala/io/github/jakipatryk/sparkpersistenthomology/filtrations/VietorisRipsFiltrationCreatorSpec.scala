@@ -1,6 +1,6 @@
 package io.github.jakipatryk.sparkpersistenthomology.filtrations
 
-import io.github.jakipatryk.sparkpersistenthomology.Chain
+import io.github.jakipatryk.sparkpersistenthomology.{Chain, PointsCloud}
 import io.github.jakipatryk.sparkpersistenthomology.utils.Empty
 import org.apache.spark.{SparkConf, SparkContext}
 import org.scalatest.BeforeAndAfterAll
@@ -8,7 +8,7 @@ import org.scalatest.flatspec.AnyFlatSpec
 
 class VietorisRipsFiltrationCreatorSpec extends AnyFlatSpec with BeforeAndAfterAll {
 
-  var sparkContext: SparkContext = _
+  implicit var sparkContext: SparkContext = _
 
   override def beforeAll(): Unit = {
     sparkContext = new SparkContext(
