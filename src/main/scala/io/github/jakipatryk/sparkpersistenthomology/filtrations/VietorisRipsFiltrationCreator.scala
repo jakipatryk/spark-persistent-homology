@@ -14,13 +14,16 @@ object VietorisRipsFiltrationCreator extends FiltrationCreator {
                                  maxDim: Option[Int] = None,
                                  distanceCalculator: DistanceCalculator = EuclideanDistanceCalculator
                                )(implicit sparkContext: SparkContext): Filtration = {
+    pointsCloud.rdd.cache()
 
     val distanceMatrix = DistanceMatrix.fromPointsCloud(pointsCloud)
     val distanceMatrixBroadcasted = sparkContext.broadcast(distanceMatrix)
 
+    val combinationElementsSetSize = pointsCloud.rdd.count().toInt
+    val maxCombinationSize = maxDim.getOrElse(pointsCloud.rdd.collect().head.length - 1) + 1
     val system = new CombinatorialNumberSystemOnSteroids(
-      pointsCloud.rdd.count().toInt,
-      maxDim.getOrElse(pointsCloud.rdd.collect().head.length - 1) + 1
+      combinationElementsSetSize,
+      maxCombinationSize
     )
     val systemBroadcasted = sparkContext.broadcast(system)
 
@@ -34,11 +37,14 @@ object VietorisRipsFiltrationCreator extends FiltrationCreator {
           itRecovered.zip(combinationsIterator).map {
             case (_, combination) => combination.length match {
               case 1 =>
-                (0.0, combination.toList.map(_.toLong))
+                (0.0, combination.map(_.toLong).toList)
               case _ =>
                 (
-                  combination.combinations(2).map(a => distanceMatrixBroadcasted.value.getDistance(a(0), a(1))).max,
-                  combination.toList.map(_.toLong)
+                  combination
+                    .combinations(2)
+                    .map(a => distanceMatrixBroadcasted.value.getDistance(a(0), a(1)))
+                    .max,
+                  combination.map(_.toLong).toList
                 )
             }
           }
