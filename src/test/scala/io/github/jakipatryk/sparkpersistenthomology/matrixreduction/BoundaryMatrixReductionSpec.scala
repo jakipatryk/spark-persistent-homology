@@ -2,7 +2,6 @@ package io.github.jakipatryk.sparkpersistenthomology.matrixreduction
 
 import io.github.jakipatryk.sparkpersistenthomology.utils.Empty
 import io.github.jakipatryk.sparkpersistenthomology.{Chain, Key}
-import io.github.jakipatryk.sparkpersistenthomology.utils.Empty
 import org.apache.spark.{SparkConf, SparkContext}
 import org.scalatest.BeforeAndAfterAll
 import org.scalatest.flatspec.AnyFlatSpec
@@ -10,7 +9,7 @@ import org.scalatest.flatspec.AnyFlatSpec
 
 class BoundaryMatrixReductionSpec extends AnyFlatSpec with DataLoader with BeforeAndAfterAll {
 
-  var sparkContext: SparkContext = _
+  implicit var sparkContext: SparkContext = _
 
   override def beforeAll(): Unit = {
     sparkContext = new SparkContext(

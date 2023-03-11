@@ -1,5 +1,7 @@
 import io.github.jakipatryk.sparkpersistenthomology.PersistentHomology
-import io.github.jakipatryk.sparkpersistenthomology.filtrations.PointsCloud
+import io.github.jakipatryk.sparkpersistenthomology.PointsCloud
+import io.github.jakipatryk.sparkpersistenthomology.distances.DistanceCalculator
+import io.github.jakipatryk.sparkpersistenthomology.filtrations.VietorisRipsFiltrationCreator
 import io.github.jakipatryk.sparkpersistenthomology.persistenceimage.{BirthAndPersistenceBoundsConfig, PersistenceImage}
 import org.apache.spark.{SparkConf, SparkContext}
 
@@ -47,13 +49,16 @@ object Config {
 
 object SparkJob {
 
-  private val sparkContext: SparkContext = new SparkContext(
-    new SparkConf()
-      .setAppName(
-        "Example of io.github.jakipatryk.spark-persistent-homology usage " +
-          "- random points cloud, computing persistence pairs (and optionally persistence image)"
-      )
-  )
+  private implicit val sparkContext: SparkContext = {
+    new SparkContext(
+      new SparkConf()
+        .setAppName(
+          "Example of io.github.jakipatryk.spark-persistent-homology usage " +
+            "- random points cloud, computing persistence pairs (and optionally persistence image)"
+        )
+        .set("spark.serializer", "org.apache.spark.serializer.KryoSerializer")
+    )
+  }
 
   def main(args: Array[String]): Unit = {
     val parsedConfig = Config.getConfig(args)

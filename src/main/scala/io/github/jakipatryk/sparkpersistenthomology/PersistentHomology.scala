@@ -1,16 +1,10 @@
 package io.github.jakipatryk.sparkpersistenthomology
 
-import io.github.jakipatryk.sparkpersistenthomology.filtrations.{Filtration, FiltrationCreator, IndexInMatrix, InitThreshold, PointsCloud, SimplexBoundary, VietorisRipsFiltrationCreator}
-import io.github.jakipatryk.sparkpersistenthomology.matrixreduction.{BoundaryMatrix}
-import io.github.jakipatryk.sparkpersistenthomology.filtrations.{FiltrationCreator, VietorisRipsFiltrationCreator}
-import io.github.jakipatryk.sparkpersistenthomology.matrixreduction.BoundaryMatrixReduction
-import org.apache.spark.Partitioner
+import io.github.jakipatryk.sparkpersistenthomology.filtrations._
+import io.github.jakipatryk.sparkpersistenthomology.matrixreduction.{BoundaryMatrix, BoundaryMatrixReduction}
 import org.apache.spark.rdd.RDD
+import org.apache.spark.{Partitioner, SparkContext}
 
-trait Infinity
-object Infinity extends Infinity with Serializable
-
-case class PersistencePair(birth: Double, death: Either[Double, Infinity], dim: Int)
 
 object PersistentHomology {
 
@@ -28,7 +22,7 @@ object PersistentHomology {
                            numOfPartitionsConf: Option[Int] = None,
                            maxDim: Option[Int] = None,
                            filtrationCreator: FiltrationCreator = VietorisRipsFiltrationCreator
-                         ): RDD[PersistencePair] = {
+                         )(implicit sparkContext: SparkContext): RDD[PersistencePair] = {
     val filtration = filtrationCreator.createFiltration(pointsCloud, maxDim)
 
     numOfPartitionsConf match {

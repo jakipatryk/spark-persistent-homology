@@ -1,9 +1,7 @@
 package io.github.jakipatryk.sparkpersistenthomology.persistenceimage
 
-import io.github.jakipatryk.sparkpersistenthomology.{Infinity, PersistencePair}
 import io.github.jakipatryk.sparkpersistenthomology.persistenceimage.PersistenceImage.{Birth, Persistence}
 import io.github.jakipatryk.sparkpersistenthomology.utils.SingleDimMinMaxBound
-import io.github.jakipatryk.sparkpersistenthomology.persistenceimage.PersistenceImage.{Birth, Persistence}
 import io.github.jakipatryk.sparkpersistenthomology.{Infinity, PersistencePair}
 import org.apache.spark.rdd.RDD
 import org.apache.spark.{SparkConf, SparkContext}
@@ -16,7 +14,7 @@ import scala.util.Failure
 
 class PersistenceImageSpec extends AnyFlatSpec with BeforeAndAfterAll {
 
-  var sparkContext: SparkContext = _
+  implicit var sparkContext: SparkContext = _
 
   override def beforeAll(): Unit = {
     sparkContext = new SparkContext(

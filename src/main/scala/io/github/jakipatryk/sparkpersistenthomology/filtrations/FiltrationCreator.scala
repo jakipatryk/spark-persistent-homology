@@ -1,6 +1,8 @@
 package io.github.jakipatryk.sparkpersistenthomology.filtrations
 
-import io.github.jakipatryk.sparkpersistenthomology.distances.{DistanceCalculator, EuclideanDistanceCalculator}
+import io.github.jakipatryk.sparkpersistenthomology.PointsCloud
+import io.github.jakipatryk.sparkpersistenthomology.distances.DistanceCalculator
+import org.apache.spark.SparkContext
 
 trait FiltrationCreator extends Serializable {
 
@@ -15,7 +17,7 @@ trait FiltrationCreator extends Serializable {
   def createFiltration(
                         pointsCloud: PointsCloud,
                         maxDim: Option[Int] = None,
-                        distanceCalculator: DistanceCalculator = EuclideanDistanceCalculator
-                      ): Filtration
+                        distanceCalculator: DistanceCalculator = DistanceCalculator.EuclideanDistanceCalculator
+                      )(implicit sparkContext: SparkContext): Filtration
 
 }
