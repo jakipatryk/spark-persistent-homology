@@ -1,12 +1,12 @@
-package io.github.jakipatryk.sparkpersistenthomology.matrixreduction
+package io.github.jakipatryk.sparkpersistenthomology.matrixreduction.partitioners
 
 import io.github.jakipatryk.sparkpersistenthomology.Key
 import org.scalatest.flatspec.AnyFlatSpec
 
-class PivotPartitionerSpec extends AnyFlatSpec {
+class DefaultPivotPartitionerSpec extends AnyFlatSpec {
 
   "getPartition" should "return correct partition index" in {
-    val partitioner = new PivotPartitioner(3, 10)
+    val partitioner = new DefaultPivotPartitioner(3, 10)
 
     assert(partitioner.getPartition(Key(0, Some(0))) == 0)
     assert(partitioner.getPartition(Key(1, Some(1))) == 0)

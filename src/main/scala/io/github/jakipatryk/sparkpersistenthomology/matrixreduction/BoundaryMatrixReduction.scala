@@ -1,5 +1,6 @@
 package io.github.jakipatryk.sparkpersistenthomology.matrixreduction
 
+import io.github.jakipatryk.sparkpersistenthomology.matrixreduction.partitioners.DefaultPivotPartitioner
 import io.github.jakipatryk.sparkpersistenthomology.{Chain, Key}
 
 import scala.collection.mutable
@@ -53,7 +54,7 @@ object BoundaryMatrixReduction {
                             boundaryMatrixInitialLength: Long
                           ): BoundaryMatrix = {
 
-    val partitioner = new PivotPartitioner(numOfPartitions, boundaryMatrixInitialLength)
+    val partitioner = new DefaultPivotPartitioner(numOfPartitions, boundaryMatrixInitialLength)
 
     implicit val keyOrdering: Ordering[Key] = Ordering.by[Key, Long](_.indexInMatrix)
 
