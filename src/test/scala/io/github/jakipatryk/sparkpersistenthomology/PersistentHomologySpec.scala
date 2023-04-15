@@ -3,8 +3,11 @@ package io.github.jakipatryk.sparkpersistenthomology
 import io.github.jakipatryk.sparkpersistenthomology.PersistentHomology.PersistenceIndicesPair
 import io.github.jakipatryk.sparkpersistenthomology.filtrations.Filtration
 import org.apache.spark.{SparkConf, SparkContext}
-import org.scalatest.BeforeAndAfterAll
+import org.scalactic.{Equality, TolerantNumerics}
+import org.scalatest.{Assertion, BeforeAndAfterAll}
 import org.scalatest.flatspec.AnyFlatSpec
+
+import scala.io.Source
 
 class PersistentHomologySpec extends AnyFlatSpec with DataLoader with BeforeAndAfterAll {
 
@@ -21,8 +24,74 @@ class PersistentHomologySpec extends AnyFlatSpec with DataLoader with BeforeAndA
     sparkContext.stop()
   }
 
-  private def multisetEqual(l1: List[_], l2: List[_]): Boolean =
-    (l1.length == l2.length) && l1.forall(x => l2 contains x)
+  private def multisetEqual[T](l1: Seq[T], l2: Seq[T])(implicit equality: Equality[T]): Boolean =
+    (l1.length == l2.length) && l1.forall(x => l2.exists(equality.areEqual(_, x)))
+
+  private def persistencePairsEqualityWithTolerance(tolerance: Double = 1e-5): Equality[PersistencePair] = {
+    val doubleEquality: Equality[Double] = TolerantNumerics.tolerantDoubleEquality(tolerance)
+    val persistencePairsEquality: Equality[PersistencePair] = {
+      case (PersistencePair(aBirth, Left(aDeath), aDim), PersistencePair(bBirth, Left(bDeath), bDim)) =>
+        aDim == bDim &&
+          doubleEquality.areEqual(aBirth, bBirth) &&
+          doubleEquality.areEqual(aDeath, bDeath)
+      case (PersistencePair(aBirth, Right(_), aDim), PersistencePair(bBirth, Right(_), bDim)) =>
+        aDim == bDim && doubleEquality.areEqual(aBirth, bBirth)
+      case _ => false
+    }
+
+    persistencePairsEquality
+  }
+
+  private def loadPointsCloudFromCsvFile(fileName: String): PointsCloud = {
+    val source = Source.fromResource(fileName)
+    val lines = source.getLines()
+    val localPointsCloud = lines
+      .map(_.split(',').map(_.toDouble).toVector)
+      .toSeq
+    val rdd = sparkContext.parallelize(localPointsCloud)
+    PointsCloud(rdd)
+  }
+
+  private def loadPersistencePairsFromCsvFile(fileName: String, dim: Int): Seq[PersistencePair] = {
+    val source = Source.fromResource(fileName)
+    val lines = source.getLines()
+    lines
+      .map(_.split(','))
+      .map {
+        case Array(birth, "inf") => PersistencePair(birth.toDouble, Right(Infinity), dim)
+        case Array(birth, death) => PersistencePair(birth.toDouble, Left(death.toDouble), dim)
+      }
+      .toSeq
+  }
+
+  private def e2eRipserComparisonFromPointsCloudAssert(numberOfPartitions: Option[Int]): Assertion = {
+    val pointsCloud = loadPointsCloudFromCsvFile("three_spheres/points_cloud.csv")
+
+    val result =
+      PersistentHomology
+        .getPersistencePairs(pointsCloud, numOfPartitionsConf = numberOfPartitions, maxDim = Some(3))
+        .collect()
+        .toList
+        .filter(_.dim < 3)
+
+    val expected = {
+      loadPersistencePairsFromCsvFile("three_spheres/persistence_pairs_dim_0.csv", 0) ++
+        loadPersistencePairsFromCsvFile("three_spheres/persistence_pairs_dim_1.csv", 1) ++
+        loadPersistencePairsFromCsvFile("three_spheres/persistence_pairs_dim_2.csv", 2)
+    }
+
+    assert(multisetEqual(result, expected)(persistencePairsEqualityWithTolerance()))
+  }
+
+  "getPersistencePairs(pointsCloud)" should
+    "pass bigger E2E test (results from Ripser library) with number of partitions specified with VR filtration" in {
+    e2eRipserComparisonFromPointsCloudAssert(Some(8))
+  }
+
+  "getPersistencePairs(pointsCloud)" should
+    "pass bigger E2E test (results from Ripser library) with number of partitions automatically determined" in {
+    e2eRipserComparisonFromPointsCloudAssert(None)
+  }
 
   "getPersistencePairs(filtration)" should "return all finite and infinite persistence pairs for 10 triangles" in {
     val data = sparkContext.parallelize(nSeparateTriangles(10).toList)
@@ -87,6 +156,7 @@ class PersistentHomologySpec extends AnyFlatSpec with DataLoader with BeforeAndA
       PersistencePair(0.0, Left(math.sqrt(3.0)), 0) ::
       PersistencePair(math.sqrt(12.0), Right(Infinity), 1) ::
       Nil
+
     assert(multisetEqual(result, expected))
   }
 
@@ -107,6 +177,7 @@ class PersistentHomologySpec extends AnyFlatSpec with DataLoader with BeforeAndA
       PersistencePair(0.0, Left(math.sqrt(3.0)), 0) ::
       PersistencePair(0.0, Left(math.sqrt(3.0)), 0) ::
       Nil
+
     assert(multisetEqual(result, expected))
   }
 
@@ -127,6 +198,7 @@ class PersistentHomologySpec extends AnyFlatSpec with DataLoader with BeforeAndA
       PersistencePair(0.0, Left(math.sqrt(3.0)), 0) ::
       PersistencePair(0.0, Left(math.sqrt(3.0)), 0) ::
       Nil
+
     assert(multisetEqual(result, expected))
   }
 
@@ -147,6 +219,7 @@ class PersistentHomologySpec extends AnyFlatSpec with DataLoader with BeforeAndA
       PersistenceIndicesPair(1L, Right(Infinity)),
       PersistenceIndicesPair(2L, Right(Infinity))
     )
+
     assert(result == expected)
   }
 
@@ -167,6 +240,7 @@ class PersistentHomologySpec extends AnyFlatSpec with DataLoader with BeforeAndA
       PersistenceIndicesPair(5L, Right(Infinity)),
       PersistenceIndicesPair(6L, Right(Infinity))
     )
+
     assert(result == expected)
   }
 
@@ -188,6 +262,7 @@ class PersistentHomologySpec extends AnyFlatSpec with DataLoader with BeforeAndA
       PersistenceIndicesPair(5L, Right(Infinity)),
       PersistenceIndicesPair(6L, Right(Infinity))
     )
+
     assert(result == expected)
   }
 
@@ -208,6 +283,7 @@ class PersistentHomologySpec extends AnyFlatSpec with DataLoader with BeforeAndA
       PersistenceIndicesPair(3L, Right(Infinity)),
       PersistenceIndicesPair(4L, Right(Infinity))
     )
+
     assert(result == expected)
   }
 
@@ -230,6 +306,7 @@ class PersistentHomologySpec extends AnyFlatSpec with DataLoader with BeforeAndA
       PersistenceIndicesPair(4L, Right(Infinity)),
       PersistenceIndicesPair(8L, Right(Infinity))
     )
+
     assert(result == expected)
   }
 
@@ -255,6 +332,7 @@ class PersistentHomologySpec extends AnyFlatSpec with DataLoader with BeforeAndA
       PersistenceIndicesPair(8L, Right(Infinity)),
       PersistenceIndicesPair(9L, Right(Infinity))
     )
+
     assert(result == expected)
   }
 
@@ -280,6 +358,7 @@ class PersistentHomologySpec extends AnyFlatSpec with DataLoader with BeforeAndA
       PersistenceIndicesPair(8L, Right(Infinity)),
       PersistenceIndicesPair(9L, Right(Infinity))
     )
+
     assert(result == expected)
   }
 
@@ -300,6 +379,7 @@ class PersistentHomologySpec extends AnyFlatSpec with DataLoader with BeforeAndA
       .toSet
 
     val expected = Set[PersistenceIndicesPair]()
+
     assert(result == expected)
   }
 
