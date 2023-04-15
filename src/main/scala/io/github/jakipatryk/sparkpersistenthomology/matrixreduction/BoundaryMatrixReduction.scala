@@ -1,6 +1,6 @@
 package io.github.jakipatryk.sparkpersistenthomology.matrixreduction
 
-import io.github.jakipatryk.sparkpersistenthomology.matrixreduction.partitioners.DefaultPivotPartitioner
+import io.github.jakipatryk.sparkpersistenthomology.matrixreduction.orchestrators.Orchestrator
 import io.github.jakipatryk.sparkpersistenthomology.{Chain, Key}
 
 import scala.collection.mutable
@@ -9,34 +9,29 @@ object BoundaryMatrixReduction {
 
   def reduceBlock(
                    partition: Iterator[(Key, Chain)],
-                   blockColumnRange: (Long, Long),
-                   blockRowRange: (Long, Long)
+                   blockColumnRange: Orchestrator.Bounds,
+                   blockRowRange: Orchestrator.Bounds
                  ): Iterator[(Key, Chain)] = {
-
     val (alreadyReduced, unreduced) = partition.span {
-      case (key, _) => key.indexInMatrix < blockColumnRange._1
+      case (key, _) => key.indexInMatrix < blockColumnRange.start.value
     }
     val (unreducedToProcess, toReduceLater) = unreduced.span {
-      case (key, _) => key.indexInMatrix <= blockColumnRange._2
+      case (key, _) => key.indexInMatrix <= blockColumnRange.end.value
     }
 
-    val reduced = mutable.HashMap(
-      alreadyReduced
-        .toSeq
-        .map { case (k, c) => (k.pivot, (k, c)) }: _*
-    )
+    val reduced = new mutable.LongMap[(Key, Chain)]()
+    alreadyReduced.foreach { case (k, c) => reduced(k.pivot.get) = (k, c) }
 
     val processedButUnreduced: Iterator[(Key, Chain)] = unreducedToProcess.flatMap {
       case (key, column) =>
         var currentColumn = column
-        while (currentColumn.pivot.nonEmpty && reduced.contains(currentColumn.pivot)) {
-          currentColumn = currentColumn + reduced(currentColumn.pivot)._2
+        while (currentColumn.pivot.nonEmpty && reduced.contains(currentColumn.pivot.get)) {
+          currentColumn = currentColumn + reduced(currentColumn.pivot.get)._2
         }
 
         val pivot: Long = currentColumn.pivot.getOrElse(-1)
-        if (pivot >= blockRowRange._1 && pivot <= blockRowRange._2) {
-          reduced
-            .put(Some(pivot), (Key(key.indexInMatrix, Some(pivot)), currentColumn))
+        if (pivot >= blockRowRange.start.value && pivot <= blockRowRange.end.value) {
+          reduced(pivot) = (Key(key.indexInMatrix, Some(pivot)), currentColumn)
           Iterator.empty
         } else if (currentColumn.pivot.nonEmpty)
           Iterator.single((Key(key.indexInMatrix, Some(pivot)), currentColumn))
@@ -50,38 +45,27 @@ object BoundaryMatrixReduction {
 
   def reduceBoundaryMatrix(
                             boundaryMatrix: BoundaryMatrix,
-                            numOfPartitions: Int,
-                            boundaryMatrixInitialLength: Long
+                            orchestrator: Orchestrator
                           ): BoundaryMatrix = {
-
-    val partitioner = new DefaultPivotPartitioner(numOfPartitions, boundaryMatrixInitialLength)
 
     implicit val keyOrdering: Ordering[Key] = Ordering.by[Key, Long](_.indexInMatrix)
 
     var reducedMatrix = boundaryMatrix
       .rdd
       .filter { case (k, _) => k.pivot.nonEmpty }
-      .repartitionAndSortWithinPartitions(partitioner)
 
-    val blockRangeLength = Math.ceil(boundaryMatrixInitialLength.toDouble / numOfPartitions).toLong
-
-    for (step <- 0 until numOfPartitions) {
+    for (step <- 0 until orchestrator.numberOfSteps) {
       reducedMatrix = reducedMatrix
+        .repartitionAndSortWithinPartitions(orchestrator.pivotPartitionerForStep(step))
         .mapPartitionsWithIndex {
           case (partitionIndex, partitionIterator) =>
-            if (numOfPartitions - partitionIndex < step) partitionIterator
+            if (orchestrator.shouldSkipPartition(step, partitionIndex)) partitionIterator
             else {
-              val columnRange = (
-                partitionIndex * blockRangeLength + step * blockRangeLength,
-                (partitionIndex + 1) * blockRangeLength + step * blockRangeLength - 1
-              )
-              val rowRange = (partitionIndex * blockRangeLength, (partitionIndex + 1) * blockRangeLength - 1)
+              val columnRange = orchestrator.getPartitionColumnBounds(step, partitionIndex)
+              val rowRange = orchestrator.getPartitionRowBounds(step, partitionIndex)
               reduceBlock(partitionIterator, columnRange, rowRange)
             }
         }
-
-      reducedMatrix = reducedMatrix
-        .repartitionAndSortWithinPartitions(partitioner)
     }
 
     BoundaryMatrix(reducedMatrix)

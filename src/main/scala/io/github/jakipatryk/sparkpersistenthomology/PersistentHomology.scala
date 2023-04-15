@@ -1,8 +1,10 @@
 package io.github.jakipatryk.sparkpersistenthomology
 
 import io.github.jakipatryk.sparkpersistenthomology.filtrations._
+import io.github.jakipatryk.sparkpersistenthomology.matrixreduction.orchestrators.{DefaultOrchestrator, Orchestrator, VietorisRipsOptimisedOrchestrator}
 import io.github.jakipatryk.sparkpersistenthomology.matrixreduction.{BoundaryMatrix, BoundaryMatrixReduction}
 import org.apache.spark.rdd.RDD
+import org.apache.spark.storage.StorageLevel
 import org.apache.spark.{Partitioner, SparkContext}
 
 
@@ -15,33 +17,55 @@ object PersistentHomology {
    * @param maxDim (default None) max dimension of simplices in a filtration;
    *               dimension of a simplex = (number of points that define it) - 1
    * @param filtrationCreator (default VietorisRipsFiltrationCreator)
+   * @param customOrchestrator orchestrator to be used, by default None meaning that
+   *                           Orchestrator will be inferred from provided `filtrationCreator`
    * @return All (finite and infinite) persistence pairs
    */
   def getPersistencePairs(
                            pointsCloud: PointsCloud,
                            numOfPartitionsConf: Option[Int] = None,
                            maxDim: Option[Int] = None,
-                           filtrationCreator: FiltrationCreator = VietorisRipsFiltrationCreator
+                           filtrationCreator: FiltrationCreator = VietorisRipsFiltrationCreator,
+                           customOrchestrator: Option[Orchestrator] = None
                          )(implicit sparkContext: SparkContext): RDD[PersistencePair] = {
     val filtration = filtrationCreator.createFiltration(pointsCloud, maxDim)
 
-    numOfPartitionsConf match {
-      case Some(n) => getPersistencePairs(filtration, n)
-      case None => getPersistencePairs(filtration)
+    val combinationElementsSetSize = pointsCloud.rdd.count().toInt
+    val maxSimplicesDim = maxDim.getOrElse(pointsCloud.rdd.collect().head.length - 1)
+
+    val numberOfPartitions = numOfPartitionsConf.getOrElse {
+      val defaultPartitioner = Partitioner.defaultPartitioner(filtration.rdd)
+      defaultPartitioner.numPartitions
     }
+
+    val orchestrator = customOrchestrator.getOrElse(
+      filtrationCreator match {
+        case VietorisRipsFiltrationCreator =>
+          new VietorisRipsOptimisedOrchestrator(numberOfPartitions, combinationElementsSetSize, maxSimplicesDim)
+        case _ =>
+          filtration.rdd.persist(StorageLevel.MEMORY_AND_DISK)
+          val filtrationLength = filtration.rdd.count()
+          new DefaultOrchestrator(numberOfPartitions, filtrationLength)
+      }
+    )
+
+    getPersistencePairs(filtration, numberOfPartitions, orchestrator)
   }
 
-  /**
-   * Takes a filtration and computes all persistence pairs (including infinite ones).
-   *
-   * @param filtration RDD representing filtration
-   * @return All (finite and infinite) persistence pairs
-   */
   def getPersistencePairs(filtration: Filtration): RDD[PersistencePair] = {
     val defaultPartitioner = Partitioner.defaultPartitioner(filtration.rdd)
-    val numOfPartitions = defaultPartitioner.numPartitions
+    val numberOfPartitions = defaultPartitioner.numPartitions
 
-    getPersistencePairs(filtration, numOfPartitions)
+    getPersistencePairs(filtration, numberOfPartitions)
+  }
+
+  def getPersistencePairs(filtration: Filtration, numOfPartitions: Int): RDD[PersistencePair] = {
+    filtration.rdd.persist(StorageLevel.MEMORY_AND_DISK)
+
+    val filtrationLength = filtration.rdd.count()
+    val orchestrator = new DefaultOrchestrator(numOfPartitions, filtrationLength)
+
+    getPersistencePairs(filtration, numOfPartitions, orchestrator)
   }
 
   /**
@@ -51,13 +75,18 @@ object PersistentHomology {
    * @param numOfPartitions number of partitions to use when calculating persistent homology
    * @return All (finite and infinite) persistence pairs
    */
-  def getPersistencePairs(filtration: Filtration, numOfPartitions: Int): RDD[PersistencePair] = {
-    filtration.rdd.cache()
+  def getPersistencePairs(
+                           filtration: Filtration,
+                           numOfPartitions: Int,
+                           orchestrator: Orchestrator
+                         ): RDD[PersistencePair] = {
+    filtration.rdd.persist(StorageLevel.MEMORY_AND_DISK)
+
     val filtrationLength = filtration.rdd.count()
+
     val (boundaryMatrix, mapping) = filtrationToBoundaryMatrixAndThresholdMapping(filtration)
 
-    val reducedMatrix = BoundaryMatrixReduction
-      .reduceBoundaryMatrix(boundaryMatrix, numOfPartitions, filtrationLength)
+    val reducedMatrix = BoundaryMatrixReduction.reduceBoundaryMatrix(boundaryMatrix, orchestrator)
 
     val finiteIndicesPairs = reducedMatrix.rdd.map {
       case (Key(indexInMatrix, Some(pivot)), _) => PersistenceIndicesPair(pivot, Left(indexInMatrix))
