@@ -11,7 +11,7 @@ class CombinatorialNumberSystemOnSteroids(
                                            maxCombinationSize: Int
                                          ) extends Serializable {
 
-  private val combinationsLookup: LocalMatrix[Long] = {
+  private[sparkpersistenthomology] val combinationsLookup: LocalMatrix[Long] = {
     val matrix = LocalMatrix.zero[Long](combinationElementsSetSize + 1, maxCombinationSize + 1)
 
     for(i <- 0 to combinationElementsSetSize) {
@@ -28,7 +28,7 @@ class CombinatorialNumberSystemOnSteroids(
     matrix
   }
 
-  private val combinationsRunningCounts: Array[Long] = {
+  private[sparkpersistenthomology] val combinationsRunningCounts: Array[Long] = {
     val runningCounts = Array.fill(maxCombinationSize + 1)(0L)
     for {
       i <- 1 to maxCombinationSize
