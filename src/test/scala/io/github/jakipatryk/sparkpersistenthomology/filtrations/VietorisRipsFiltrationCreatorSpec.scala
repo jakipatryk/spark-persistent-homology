@@ -120,36 +120,36 @@ class VietorisRipsFiltrationCreatorSpec extends AnyFlatSpec with BeforeAndAfterA
     assert(filtration(4) == (IndexInMatrix(4), InitThreshold(1.0), SimplexBoundary(Chain(List(1L, 0L)))))
     assert(filtration(5) == (IndexInMatrix(5), InitThreshold(2.0), SimplexBoundary(Chain(List(3L, 0L)))))
     assert(filtration(6) == (IndexInMatrix(6), InitThreshold(math.sqrt(5.0)), SimplexBoundary(Chain(List(3L, 1L)))))
-    assert(filtration(7) == (IndexInMatrix(7), InitThreshold(math.sqrt(5.0)), SimplexBoundary(Chain(List(6L, 5L, 4L)))))
+    assert(
+      filtration(7) ==
+        (IndexInMatrix(7), InitThreshold(math.sqrt(25.0 + 9.0 + 25.0)), SimplexBoundary(Chain(List(3L, 2L))))
+    )
     assert(
       filtration(8) ==
-        (IndexInMatrix(8), InitThreshold(math.sqrt(25.0 + 9.0 + 25.0)), SimplexBoundary(Chain(List(3L, 2L))))
+        (IndexInMatrix(8), InitThreshold(math.sqrt(16.0 + 25.0 + 25.0)), SimplexBoundary(Chain(List(2L, 1L))))
     )
     assert(
       filtration(9) ==
-        (IndexInMatrix(9), InitThreshold(math.sqrt(16.0 + 25.0 + 25.0)), SimplexBoundary(Chain(List(2L, 1L))))
+        (IndexInMatrix(9), InitThreshold(math.sqrt(25.0 + 25.0 + 25.0)), SimplexBoundary(Chain(List(2L, 0L))))
     )
-    assert(
-      filtration(10) ==
-        (IndexInMatrix(10), InitThreshold(math.sqrt(16.0 + 25.0 + 25.0)), SimplexBoundary(Chain(List(9L, 8L, 6L))))
-    )
+    assert(filtration(10) == (IndexInMatrix(10), InitThreshold(math.sqrt(5.0)), SimplexBoundary(Chain(List(6L, 5L, 4L)))))
     assert(
       filtration(11) ==
-        (IndexInMatrix(11), InitThreshold(math.sqrt(25.0 + 25.0 + 25.0)), SimplexBoundary(Chain(List(2L, 0L))))
+        (IndexInMatrix(11), InitThreshold(math.sqrt(16.0 + 25.0 + 25.0)), SimplexBoundary(Chain(List(8L, 7L, 6L))))
     )
     assert(
       filtration.slice(12, 14).map(x => (x._2, x._3))
         contains
-        (InitThreshold(math.sqrt(25.0 + 25.0 + 25.0)), SimplexBoundary(Chain(List(11L, 8L, 5L)))))
+        (InitThreshold(math.sqrt(25.0 + 25.0 + 25.0)), SimplexBoundary(Chain(List(9L, 8L, 4L)))))
     assert(
       filtration.slice(12, 14).map(x => (x._2, x._3))
         contains
-        (InitThreshold(math.sqrt(25.0 + 25.0 + 25.0)), SimplexBoundary(Chain(List(11L, 9L, 4L)))))
+        (InitThreshold(math.sqrt(25.0 + 25.0 + 25.0)), SimplexBoundary(Chain(List(9L, 7L, 5L)))))
     assert(
       filtration(14) ==
         (IndexInMatrix(14),
           InitThreshold(math.sqrt(25.0 + 25.0 + 25.0)),
-          SimplexBoundary(Chain(List(13L, 12L, 10L, 7L))))
+          SimplexBoundary(Chain(List(13L, 12L, 11L, 10L))))
     )
   }
 
@@ -168,31 +168,31 @@ class VietorisRipsFiltrationCreatorSpec extends AnyFlatSpec with BeforeAndAfterA
     assert(filtration(4) == (IndexInMatrix(4), InitThreshold(1.0), SimplexBoundary(Chain(List(1L, 0L)))))
     assert(filtration(5) == (IndexInMatrix(5), InitThreshold(2.0), SimplexBoundary(Chain(List(3L, 0L)))))
     assert(filtration(6) == (IndexInMatrix(6), InitThreshold(math.sqrt(5.0)), SimplexBoundary(Chain(List(3L, 1L)))))
-    assert(filtration(7) == (IndexInMatrix(7), InitThreshold(math.sqrt(5.0)), SimplexBoundary(Chain(List(6L, 5L, 4L)))))
+    assert(
+      filtration(7) ==
+        (IndexInMatrix(7), InitThreshold(math.sqrt(25.0 + 9.0 + 25.0)), SimplexBoundary(Chain(List(3L, 2L))))
+    )
     assert(
       filtration(8) ==
-        (IndexInMatrix(8), InitThreshold(math.sqrt(25.0 + 9.0 + 25.0)), SimplexBoundary(Chain(List(3L, 2L))))
+        (IndexInMatrix(8), InitThreshold(math.sqrt(16.0 + 25.0 + 25.0)), SimplexBoundary(Chain(List(2L, 1L))))
     )
     assert(
       filtration(9) ==
-        (IndexInMatrix(9), InitThreshold(math.sqrt(16.0 + 25.0 + 25.0)), SimplexBoundary(Chain(List(2L, 1L))))
+        (IndexInMatrix(9), InitThreshold(math.sqrt(25.0 + 25.0 + 25.0)), SimplexBoundary(Chain(List(2L, 0L))))
     )
-    assert(
-      filtration(10) ==
-        (IndexInMatrix(10), InitThreshold(math.sqrt(16.0 + 25.0 + 25.0)), SimplexBoundary(Chain(List(9L, 8L, 6L))))
-    )
+    assert(filtration(10) == (IndexInMatrix(10), InitThreshold(math.sqrt(5.0)), SimplexBoundary(Chain(List(6L, 5L, 4L)))))
     assert(
       filtration(11) ==
-        (IndexInMatrix(11), InitThreshold(math.sqrt(25.0 + 25.0 + 25.0)), SimplexBoundary(Chain(List(2L, 0L))))
+        (IndexInMatrix(11), InitThreshold(math.sqrt(16.0 + 25.0 + 25.0)), SimplexBoundary(Chain(List(8L, 7L, 6L))))
     )
     assert(
       filtration.slice(12, 14).map(x => (x._2, x._3))
         contains
-        (InitThreshold(math.sqrt(25.0 + 25.0 + 25.0)), SimplexBoundary(Chain(List(11L, 8L, 5L)))))
+        (InitThreshold(math.sqrt(25.0 + 25.0 + 25.0)), SimplexBoundary(Chain(List(9L, 8L, 4L)))))
     assert(
       filtration.slice(12, 14).map(x => (x._2, x._3))
         contains
-        (InitThreshold(math.sqrt(25.0 + 25.0 + 25.0)), SimplexBoundary(Chain(List(11L, 9L, 4L)))))
+        (InitThreshold(math.sqrt(25.0 + 25.0 + 25.0)), SimplexBoundary(Chain(List(9L, 7L, 5L)))))
   }
 
   "createFiltration" should

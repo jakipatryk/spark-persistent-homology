@@ -53,7 +53,7 @@ object VietorisRipsFiltrationCreator extends FiltrationCreator {
     )
 
     val pointsDefiningBoundaryRDD = initAndPoints
-      .sortBy { case (initThreshold, points) => (initThreshold, points.length) }
+      .sortBy { case (initThreshold, points) => (points.length, initThreshold) }
         .zipWithIndex()
         .map {
           case ((initThreshold, pointsDefiningBoundary), index) =>

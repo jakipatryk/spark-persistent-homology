@@ -1,5 +1,6 @@
 package io.github.jakipatryk.sparkpersistenthomology.matrixreduction
 
+import io.github.jakipatryk.sparkpersistenthomology.matrixreduction.orchestrators.{DefaultOrchestrator, Orchestrator}
 import io.github.jakipatryk.sparkpersistenthomology.utils.Empty
 import io.github.jakipatryk.sparkpersistenthomology.{Chain, Key}
 import org.apache.spark.{SparkConf, SparkContext}
@@ -25,7 +26,16 @@ class BoundaryMatrixReductionSpec extends AnyFlatSpec with DataLoader with Befor
   "reduceBlock" should "make matrix reduced if the entire boundary matrix is given and block range is whole matrix" in {
     val data = nSeparateTriangles(3)
 
-    val result = BoundaryMatrixReduction.reduceBlock(data, (0L, 20L), (0L, 20L))
+    val blockColumnRange = Orchestrator.Bounds(
+      Orchestrator.BoundStartInclusive(0L),
+      Orchestrator.BoundEndInclusive(20L),
+    )
+    val blockRowRange = Orchestrator.Bounds(
+      Orchestrator.BoundStartInclusive(0L),
+      Orchestrator.BoundEndInclusive(20L),
+    )
+
+    val result = BoundaryMatrixReduction.reduceBlock(data, blockColumnRange, blockRowRange)
       .toList
       .sortBy { case (k, _) => k.indexInMatrix }
 
@@ -53,7 +63,16 @@ class BoundaryMatrixReductionSpec extends AnyFlatSpec with DataLoader with Befor
         :: (Key(24L, Some(3L)), Chain(3L :: 2L :: Nil))
         :: Nil).iterator
 
-    val result = BoundaryMatrixReduction.reduceBlock(columnsInPartition, (10L, 20L), (2L, 4L))
+    val blockColumnRange = Orchestrator.Bounds(
+      Orchestrator.BoundStartInclusive(10L),
+      Orchestrator.BoundEndInclusive(20L),
+    )
+    val blockRowRange = Orchestrator.Bounds(
+      Orchestrator.BoundStartInclusive(2L),
+      Orchestrator.BoundEndInclusive(4L),
+    )
+
+    val result = BoundaryMatrixReduction.reduceBlock(columnsInPartition, blockColumnRange, blockRowRange)
       .toList
       .sortBy { case (k, _) => k.indexInMatrix }
 
@@ -72,14 +91,16 @@ class BoundaryMatrixReductionSpec extends AnyFlatSpec with DataLoader with Befor
     assert(result(3) == (Key(24L, Some(3L)), Chain(3L :: 2L :: Nil)))
   }
 
-  "reduceBoundaryMatrix" should "reduce boundary matrix of 10 triangles with 3 partitions correctly" in {
+  "reduceBoundaryMatrix" should
+    "reduce boundary matrix of 10 triangles with 3 partitions correctly with DefaultOrchestrator" in {
     val data = sparkContext.parallelize(nSeparateTriangles(10).toList)
     val boundaryMatrix = BoundaryMatrix(data)
     val filtrationLength = data.count()
+    val orchestrator = new DefaultOrchestrator(3, filtrationLength)
 
     val result =
       BoundaryMatrixReduction
-        .reduceBoundaryMatrix(boundaryMatrix, 3, filtrationLength)
+        .reduceBoundaryMatrix(boundaryMatrix, orchestrator)
         .rdd
         .collect()
         .toList
@@ -92,10 +113,11 @@ class BoundaryMatrixReductionSpec extends AnyFlatSpec with DataLoader with Befor
     val data = sparkContext.parallelize(nSeparateTriangles(10).toList)
     val boundaryMatrix = BoundaryMatrix(data)
     val filtrationLength = data.count()
+    val orchestrator = new DefaultOrchestrator(8, filtrationLength)
 
     val result =
       BoundaryMatrixReduction
-        .reduceBoundaryMatrix(boundaryMatrix, 8, filtrationLength)
+        .reduceBoundaryMatrix(boundaryMatrix, orchestrator)
         .rdd
         .collect()
         .toList
