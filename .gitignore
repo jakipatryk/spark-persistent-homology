@@ -8,3 +8,11 @@
 /examples/*/project/target/
 /examples/*/.idea/
 /examples/*/.bsp/
+
+# Python
+.venv/
+__pycache__/
+*.pyc
+
+# Editors
+.vscode/
