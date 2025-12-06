@@ -152,7 +152,7 @@ object PersistenceImage {
         val imageAsVector = image.toVector.map(_.toVector)
         val persistenceImage = PersistenceImage(
           imageAsVector,
-          pixelSizesAndBoundsPerDim.mapValues { case (_, _, bounds) => bounds }
+          pixelSizesAndBoundsPerDim.mapValues { case (_, _, bounds) => bounds }.toMap
         )
         Success(persistenceImage)
       } else Failure(new IllegalStateException(illegalBoundsErrors.mkString(" ")))
@@ -216,7 +216,7 @@ object PersistenceImage {
       .forall(
         _._2
           .productIterator
-          .forall { case conf: Option[Double] => conf.isDefined }
+          .forall { case conf: Option[_] => conf.isDefined }
       )
 
     val boundsPerDim =
