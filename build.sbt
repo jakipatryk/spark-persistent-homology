@@ -18,6 +18,8 @@ version := "0.1.0-SNAPSHOT"
 
 scalaVersion := "2.12.14"
 
+scalacOptions ++= Seq("-feature", "-language:postfixOps")
+
 crossScalaVersions := Seq("2.12.14", "2.13.12")
 
 val sparkVersion = System.getProperty("spark.version", "3.3.0")
