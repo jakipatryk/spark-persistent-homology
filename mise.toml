@@ -1,0 +1,4 @@
+[tools]
+java = "corretto-17"
+sbt = "1.12.1"
+scala = "2.12.21"
