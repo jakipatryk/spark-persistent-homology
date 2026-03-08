@@ -1,12 +1,12 @@
-package io.github.jakipatryk.sparkpersistenthomology.distances
+package io.github.jakipatryk.sparkpersistenthomology.internal.distances
 
-trait DistanceCalculator extends Serializable {
+private[sparkpersistenthomology] trait DistanceCalculator extends Serializable {
 
   def calculateDistance(v1: Vector[Double], v2: Vector[Double]): Double
 
 }
 
-object DistanceCalculator {
+private[sparkpersistenthomology] object DistanceCalculator {
 
   object EuclideanDistanceCalculator extends DistanceCalculator {
 
