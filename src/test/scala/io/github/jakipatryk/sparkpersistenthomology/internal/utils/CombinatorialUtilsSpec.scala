@@ -1,6 +1,6 @@
-package io.github.jakipatryk.sparkpersistenthomology.utils
+package io.github.jakipatryk.sparkpersistenthomology.internal.utils
 
-import org.apache.spark.{SparkConf, SparkContext}
+import org.apache.spark.{ SparkConf, SparkContext }
 import org.scalatest.BeforeAndAfterAll
 import org.scalatest.flatspec.AnyFlatSpec
 
@@ -21,13 +21,13 @@ class CombinatorialUtilsSpec extends AnyFlatSpec with BeforeAndAfterAll {
 
   "computeForAllCombinationsUpToN" should "return all 1 element combinations when n=1" in {
     val list = List(1, 3, 8, 54, 5)
-    val rdd = sparkContext.parallelize(list)
+    val rdd  = sparkContext.parallelize(list)
 
     val result = CombinatorialUtils
       .computeForAllCombinationsUpToN(rdd, 1, (l: List[(Int, Long)]) => l.head._1)
       .collect()
     val resultCombinationIndices = result.map { case (_, indices) => indices }
-    val resultCombinationValues = result.map { case (value, _) => value }
+    val resultCombinationValues  = result.map { case (value, _) => value }
 
     assert(result.length == 5)
     for (value <- list) assert(resultCombinationValues contains value)
@@ -67,10 +67,14 @@ class CombinatorialUtilsSpec extends AnyFlatSpec with BeforeAndAfterAll {
 
   "computeForAllCombinationsUpToN" should "calculate sum when given that function (n=2)" in {
     val list = List(1, 3, 8, 54, 5)
-    val rdd = sparkContext.parallelize(list)
+    val rdd  = sparkContext.parallelize(list)
 
     val result = CombinatorialUtils
-      .computeForAllCombinationsUpToN(rdd, 2, (l: List[(Int, Long)]) => l.map { case (i, _) => i }.sum )
+      .computeForAllCombinationsUpToN(
+        rdd,
+        2,
+        (l: List[(Int, Long)]) => l.map { case (i, _) => i }.sum
+      )
       .collect()
     val resultCombinationSums = result.map { case (value, _) => value }
 
@@ -102,10 +106,14 @@ class CombinatorialUtilsSpec extends AnyFlatSpec with BeforeAndAfterAll {
 
   "computeForAllCombinationsUpToN" should "calculate sum when given that function (n=3)" in {
     val list = List(1, 3, 8, 54, 5)
-    val rdd = sparkContext.parallelize(list)
+    val rdd  = sparkContext.parallelize(list)
 
     val result = CombinatorialUtils
-      .computeForAllCombinationsUpToN(rdd, 3, (l: List[(Int, Long)]) => l.map { case (i, _) => i }.sum)
+      .computeForAllCombinationsUpToN(
+        rdd,
+        3,
+        (l: List[(Int, Long)]) => l.map { case (i, _) => i }.sum
+      )
       .collect()
     val resultCombinationSums = result.map { case (value, _) => value }
 
@@ -143,10 +151,14 @@ class CombinatorialUtilsSpec extends AnyFlatSpec with BeforeAndAfterAll {
 
   "computeForAllCombinationsUpToN" should "calculate sum when given that function (n=4)" in {
     val list = List(1, 3, 8, 54, 5)
-    val rdd = sparkContext.parallelize(list)
+    val rdd  = sparkContext.parallelize(list)
 
     val result = CombinatorialUtils
-      .computeForAllCombinationsUpToN(rdd, 4, (l: List[(Int, Long)]) => l.map { case (i, _) => i }.sum)
+      .computeForAllCombinationsUpToN(
+        rdd,
+        4,
+        (l: List[(Int, Long)]) => l.map { case (i, _) => i }.sum
+      )
       .collect()
     val resultCombinationSums = result.map { case (value, _) => value }
 

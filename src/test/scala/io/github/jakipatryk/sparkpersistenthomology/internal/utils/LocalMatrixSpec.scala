@@ -1,4 +1,4 @@
-package io.github.jakipatryk.sparkpersistenthomology.utils
+package io.github.jakipatryk.sparkpersistenthomology.internal.utils
 
 import org.scalatest.flatspec.AnyFlatSpec
 

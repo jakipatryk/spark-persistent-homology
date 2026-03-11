@@ -1,4 +1,4 @@
-package io.github.jakipatryk.sparkpersistenthomology.utils
+package io.github.jakipatryk.sparkpersistenthomology.internal.utils
 
 import org.scalatest.flatspec.AnyFlatSpec
 
@@ -54,7 +54,7 @@ class CombinatorialNumberSystemOnSteroidsSpec extends AnyFlatSpec {
   it should "return a correct iterator for system with `maxCombinationSize` = 1" in {
     val systemUpTo1 = CombinatorialNumberSystemOnSteroids(8, 1)
 
-    val actualIterator = systemUpTo1.combinationsIterator(0)
+    val actualIterator   = systemUpTo1.combinationsIterator(0)
     val expectedIterator = Iterator(0, 1, 2, 3, 4, 5, 6, 7).map(Array(_))
 
     (actualIterator zip expectedIterator) foreach { case (actual, expected) =>
@@ -102,7 +102,7 @@ class CombinatorialNumberSystemOnSteroidsSpec extends AnyFlatSpec {
       Array(7, 3),
       Array(7, 4),
       Array(7, 5),
-      Array(7, 6),
+      Array(7, 6)
     )
 
     (actualIterator zip expectedIterator) foreach { case (actual, expected) =>
@@ -115,7 +115,7 @@ class CombinatorialNumberSystemOnSteroidsSpec extends AnyFlatSpec {
   it should "return a correct iterator for system with `maxCombinationSize` = 1" in {
     val systemUpTo1 = CombinatorialNumberSystemOnSteroids(8, 1)
 
-    val actualIterator = systemUpTo1.combinationsIterator(5)
+    val actualIterator   = systemUpTo1.combinationsIterator(5)
     val expectedIterator = Iterator(5, 6, 7).map(Array(_))
 
     (actualIterator zip expectedIterator) foreach { case (actual, expected) =>
@@ -138,7 +138,7 @@ class CombinatorialNumberSystemOnSteroidsSpec extends AnyFlatSpec {
       Array(7, 3),
       Array(7, 4),
       Array(7, 5),
-      Array(7, 6),
+      Array(7, 6)
     )
 
     (actualIterator zip expectedIterator) foreach { case (actual, expected) =>
