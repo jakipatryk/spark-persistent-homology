@@ -1,7 +1,10 @@
 package io.github.jakipatryk.sparkpersistenthomology.internal.persistenceimage
 
 import io.github.jakipatryk.sparkpersistenthomology.PersistencePair
-import io.github.jakipatryk.sparkpersistenthomology.persistenceimage.InfluenceDistribution
+import io.github.jakipatryk.sparkpersistenthomology.persistenceimage.{
+  InfluenceDistribution,
+  WeightingFunction
+}
 import org.apache.spark.ml.linalg.DenseMatrix
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
@@ -12,15 +15,19 @@ class PersistenceImageAggregatorSpec extends AnyFlatSpec with Matchers {
     override def compute(center: (Double, Double), point: (Double, Double)): Double = value
   }
 
-  val numPixelsBirth                        = 2
-  val numPixelsPersistence                  = 2
-  val birthSize                             = 1.0
-  val persistenceSize                       = 1.0
-  val minBirth                              = 0.0
-  val minPersistence                        = 0.0
-  val influence                             = new ConstantInfluenceDistribution(1.0)
-  val weighting: (Double, Double) => Double = (_, _) => 1.0
-  val samples                               = 1
+  class ConstantWeightingFunction(value: Double) extends WeightingFunction {
+    override def compute(birth: Double, persistence: Double): Double = value
+  }
+
+  val numPixelsBirth       = 2
+  val numPixelsPersistence = 2
+  val birthSize            = 1.0
+  val persistenceSize      = 1.0
+  val minBirth             = 0.0
+  val minPersistence       = 0.0
+  val influence            = new ConstantInfluenceDistribution(1.0)
+  val weighting            = new ConstantWeightingFunction(1.0)
+  val samples              = 1
 
   val aggregator = new PersistenceImageAggregator(
     numPixelsBirth,

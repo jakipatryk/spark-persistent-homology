@@ -8,9 +8,9 @@ trait DistanceCalculator extends Serializable {
 
 object DistanceCalculator {
 
-  final object EuclideanDistanceCalculator extends DistanceCalculator {
+  object EuclideanDistanceCalculator extends DistanceCalculator {
 
-    @inline override def calculateDistance(v1: Array[Float], v2: Array[Float]): Float = {
+    override def calculateDistance(v1: Array[Float], v2: Array[Float]): Float = {
       val len = v1.length
       var sum = 0.0f
       var i   = 0

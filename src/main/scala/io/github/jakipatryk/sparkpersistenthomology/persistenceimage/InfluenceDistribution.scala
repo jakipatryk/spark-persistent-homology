@@ -1,6 +1,6 @@
 package io.github.jakipatryk.sparkpersistenthomology.persistenceimage
 
-abstract class InfluenceDistribution extends Serializable {
+trait InfluenceDistribution extends Serializable {
 
   /** Computes influence of `center` to `point`.
     */

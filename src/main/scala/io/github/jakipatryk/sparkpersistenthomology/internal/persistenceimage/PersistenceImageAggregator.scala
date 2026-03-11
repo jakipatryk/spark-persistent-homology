@@ -1,7 +1,10 @@
 package io.github.jakipatryk.sparkpersistenthomology.internal.persistenceimage
 
 import io.github.jakipatryk.sparkpersistenthomology.PersistencePair
-import io.github.jakipatryk.sparkpersistenthomology.persistenceimage.InfluenceDistribution
+import io.github.jakipatryk.sparkpersistenthomology.persistenceimage.{
+  InfluenceDistribution,
+  WeightingFunction
+}
 import io.github.jakipatryk.sparkpersistenthomology.internal.utils.IntegrationOverRectangle
 import org.apache.spark.ml.linalg.{ DenseMatrix, Matrices }
 import org.apache.spark.sql.expressions.Aggregator
@@ -15,7 +18,7 @@ private[sparkpersistenthomology] class PersistenceImageAggregator(
   minBirth: Double,
   minPersistence: Double,
   influenceDistribution: InfluenceDistribution,
-  weightingFunction: (Double, Double) => Double,
+  weightingFunction: WeightingFunction,
   monteCarloIntegrationSamplesPerPixel: Int
 ) extends Aggregator[PersistencePair, Array[Double], DenseMatrix] {
 
@@ -26,7 +29,7 @@ private[sparkpersistenthomology] class PersistenceImageAggregator(
     if (pair.isFinite) {
       val birth       = pair.birth.toDouble
       val persistence = pair.persistence.toDouble
-      val weight      = weightingFunction(birth, persistence)
+      val weight      = weightingFunction.compute(birth, persistence)
 
       for {
         i <- 0 until numberOfPixelsOnBirthAxis

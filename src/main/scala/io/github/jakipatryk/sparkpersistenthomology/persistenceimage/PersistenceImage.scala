@@ -17,10 +17,6 @@ case class PersistenceImage private (
 
 object PersistenceImage {
 
-  final case class Birth(value: Double)       extends AnyVal
-  final case class Persistence(value: Double) extends AnyVal
-  final case class Weight(value: Double)      extends AnyVal
-
   final case class ImageBound(min: Double, max: Double)
 
   /** Generates persistence image from persistence pairs (output of persistence homology). The input
@@ -41,8 +37,9 @@ object PersistenceImage {
     *   "Influence distribution" is used to calculate influence of a persistence pair on a given
     *   point (pixel) in the image. Typical one is gaussian distribution.
     * @param weightingFunction
-    *   Function that weights overall influence of persistence point. Takes Birth and Persistence
-    *   (death - birth) and outputs weight. Typical is to just take Persistence and ignore birth.
+    *   "Weighting function" that weights overall influence of persistence point. Takes birth and
+    *   persistence (death - birth) and outputs weight. Typical is to just take persistence and
+    *   ignore birth.
     * @param monteCarloIntegrationSamplesPerPixel
     *   Number of samples used in computing Monte Carlo Integral for each pixel and persistence
     *   pair. The higher number the better image approximation, but slower computation.
@@ -55,7 +52,7 @@ object PersistenceImage {
     numberOfPixelsOnBirthAxis: Int,
     numberOfPixelsOnPersistenceAxis: Int,
     influenceDistribution: InfluenceDistribution,
-    weightingFunction: (Birth, Persistence) => Weight = (_, p) => Weight(p.value),
+    weightingFunction: WeightingFunction = WeightingFunction.JustPersistenceWeightingFunction,
     monteCarloIntegrationSamplesPerPixel: Int = 5
   ): PersistenceImage = {
     validateDimensionsConfig(boundsConfig)
@@ -85,7 +82,7 @@ object PersistenceImage {
         birthBound.min,
         persistenceBound.min,
         influenceDistribution,
-        (b, p) => weightingFunction(Birth(b), Persistence(p)).value,
+        weightingFunction,
         monteCarloIntegrationSamplesPerPixel
       )
 

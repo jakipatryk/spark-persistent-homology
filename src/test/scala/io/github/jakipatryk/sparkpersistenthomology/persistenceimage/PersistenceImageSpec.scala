@@ -1,9 +1,5 @@
 package io.github.jakipatryk.sparkpersistenthomology.persistenceimage
 
-import io.github.jakipatryk.sparkpersistenthomology.persistenceimage.PersistenceImage.{
-  Birth,
-  Persistence
-}
 import io.github.jakipatryk.sparkpersistenthomology.PersistencePair
 import org.apache.spark.ml.linalg.DenseMatrix
 import org.apache.spark.sql.{ Dataset, SparkSession }
