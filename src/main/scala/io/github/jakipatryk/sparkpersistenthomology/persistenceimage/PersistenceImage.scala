@@ -9,18 +9,6 @@ import org.apache.spark.ml.linalg.DenseMatrix
 import org.apache.spark.sql.Dataset
 import org.apache.spark.sql.functions._
 
-import scala.util.{ Failure, Success, Try }
-
-/** Represents configuration of bounds of an image. If any of them is None, its value is calculated
-  * based of min/max values of birth/persistence (death - birth) of persistence pairs.
-  */
-case class BirthAndPersistenceBoundsConfig(
-  minBirth: Option[Double] = None,
-  maxBirth: Option[Double] = None,
-  minPersistence: Option[Double] = None,
-  maxPersistence: Option[Double] = None
-)
-
 case class PersistenceImage private (
   image: DenseMatrix,
   birthBound: PersistenceImage.ImageBound,
@@ -69,84 +57,45 @@ object PersistenceImage {
     influenceDistribution: InfluenceDistribution,
     weightingFunction: (Birth, Persistence) => Weight = (_, p) => Weight(p.value),
     monteCarloIntegrationSamplesPerPixel: Int = 5
-  ): Try[PersistenceImage] = {
-    import persistencePairs.sparkSession.implicits._
+  ): PersistenceImage = {
+    validateDimensionsConfig(boundsConfig)
 
-    val isConfigValid = validateDimensionsConfig(boundsConfig)
-    isConfigValid.flatMap { _ =>
-      val finitePairs = persistencePairs.filter(p => !p.death.isPosInfinity)
+    val finitePairs = persistencePairs.filter(p => !p.death.isPosInfinity)
 
-      val (
-        calculatedMinBirth,
-        calculatedMaxBirth,
-        calculatedMinPersistence,
-        calculatedMaxPersistence
-      ) =
-        if (
-          boundsConfig.minBirth.isEmpty ||
-          boundsConfig.maxBirth.isEmpty ||
-          boundsConfig.minPersistence.isEmpty ||
-          boundsConfig.maxPersistence.isEmpty
-        ) {
-          val row = finitePairs
-            .map(p => (p.birth.toDouble, (p.death - p.birth).toDouble))
-            .toDF("b", "p")
-            .agg(min("b"), max("b"), min("p"), max("p"))
-            .head()
+    val (birthBound, persistenceBound) = resolveBounds(finitePairs, boundsConfig)
 
-          if (row.isNullAt(0)) {
-            (0.0, 0.0, 0.0, 0.0)
-          } else {
-            (row.getDouble(0), row.getDouble(1), row.getDouble(2), row.getDouble(3))
-          }
-        } else {
-          (0.0, 0.0, 0.0, 0.0)
-        }
+    val birthAxisPixelSize = (birthBound.max - birthBound.min) / numberOfPixelsOnBirthAxis
+    val persistenceAxisPixelSize =
+      (persistenceBound.max - persistenceBound.min) / numberOfPixelsOnPersistenceAxis
 
-      val actualMinBirth       = boundsConfig.minBirth.getOrElse(calculatedMinBirth)
-      val actualMaxBirth       = boundsConfig.maxBirth.getOrElse(calculatedMaxBirth)
-      val actualMinPersistence = boundsConfig.minPersistence.getOrElse(calculatedMinPersistence)
-      val actualMaxPersistence = boundsConfig.maxPersistence.getOrElse(calculatedMaxPersistence)
+    if (birthAxisPixelSize <= 0) {
+      throw new IllegalStateException(
+        "Calculated pixel size on birth axis is incorrect. Please specify it by hand in config."
+      )
+    } else if (persistenceAxisPixelSize <= 0) {
+      throw new IllegalStateException(
+        "Calculated pixel size on persistence axis is incorrect. Please specify it by hand in config."
+      )
+    } else {
+      val aggregator = new PersistenceImageAggregator(
+        numberOfPixelsOnBirthAxis,
+        numberOfPixelsOnPersistenceAxis,
+        birthAxisPixelSize,
+        persistenceAxisPixelSize,
+        birthBound.min,
+        persistenceBound.min,
+        influenceDistribution,
+        (b, p) => weightingFunction(Birth(b), Persistence(p)).value,
+        monteCarloIntegrationSamplesPerPixel
+      )
 
-      val birthAxisPixelSize = (actualMaxBirth - actualMinBirth) / numberOfPixelsOnBirthAxis
-      val persistenceAxisPixelSize =
-        (actualMaxPersistence - actualMinPersistence) / numberOfPixelsOnPersistenceAxis
+      val imageMatrix = finitePairs.select(aggregator.toColumn).head()
 
-      if (birthAxisPixelSize <= 0) {
-        Failure(
-          new IllegalStateException(
-            "Calculated pixel size on birth axis is incorrect. Please specify it by hand in config."
-          )
-        )
-      } else if (persistenceAxisPixelSize <= 0) {
-        Failure(
-          new IllegalStateException(
-            "Calculated pixel size on persistence axis is incorrect. Please specify it by hand in config."
-          )
-        )
-      } else {
-        val aggregator = new PersistenceImageAggregator(
-          numberOfPixelsOnBirthAxis,
-          numberOfPixelsOnPersistenceAxis,
-          birthAxisPixelSize,
-          persistenceAxisPixelSize,
-          actualMinBirth,
-          actualMinPersistence,
-          influenceDistribution,
-          (b, p) => weightingFunction(Birth(b), Persistence(p)).value,
-          monteCarloIntegrationSamplesPerPixel
-        )
-
-        val imageMatrix = finitePairs.select(aggregator.toColumn).head()
-
-        Success(
-          PersistenceImage(
-            imageMatrix,
-            ImageBound(actualMinBirth, actualMaxBirth),
-            ImageBound(actualMinPersistence, actualMaxPersistence)
-          )
-        )
-      }
+      PersistenceImage(
+        imageMatrix,
+        birthBound,
+        persistenceBound
+      )
     }
   }
 
@@ -161,7 +110,7 @@ object PersistenceImage {
     numberOfPixelsOnPersistenceAxis: Int,
     varianceBirthAxis: Double,
     variancePersistenceAxis: Double
-  ): Try[PersistenceImage] =
+  ): PersistenceImage =
     fromPersistencePairs(
       persistencePairs,
       boundsConfig,
@@ -182,7 +131,7 @@ object PersistenceImage {
     numberOfPixelsOnBirthAxis: Int,
     numberOfPixelsOnPersistenceAxis: Int,
     variance: Double
-  ): Try[PersistenceImage] =
+  ): PersistenceImage =
     fromPersistencePairsGaussian(
       persistencePairs,
       boundsConfig,
@@ -192,9 +141,45 @@ object PersistenceImage {
       variance
     )
 
+  private def resolveBounds(
+    finitePairs: Dataset[PersistencePair],
+    boundsConfig: BirthAndPersistenceBoundsConfig
+  ): (ImageBound, ImageBound) = {
+    import finitePairs.sparkSession.implicits._
+
+    val (calcMinB, calcMaxB, calcMinP, calcMaxP) =
+      if (
+        boundsConfig.minBirth.isEmpty ||
+        boundsConfig.maxBirth.isEmpty ||
+        boundsConfig.minPersistence.isEmpty ||
+        boundsConfig.maxPersistence.isEmpty
+      ) {
+        val row = finitePairs
+          .map(p => (p.birth.toDouble, p.persistence.toDouble))
+          .agg(min("_1"), max("_1"), min("_2"), max("_2"))
+          .head()
+
+        if (row.isNullAt(0)) (0.0, 0.0, 0.0, 0.0)
+        else (row.getDouble(0), row.getDouble(1), row.getDouble(2), row.getDouble(3))
+      } else {
+        (0.0, 0.0, 0.0, 0.0)
+      }
+
+    (
+      ImageBound(
+        boundsConfig.minBirth.getOrElse(calcMinB),
+        boundsConfig.maxBirth.getOrElse(calcMaxB)
+      ),
+      ImageBound(
+        boundsConfig.minPersistence.getOrElse(calcMinP),
+        boundsConfig.maxPersistence.getOrElse(calcMaxP)
+      )
+    )
+  }
+
   private def validateDimensionsConfig(
     config: BirthAndPersistenceBoundsConfig
-  ): Try[Unit] = {
+  ): Unit = {
     val areBirthBoundsInvalid = for {
       minBirth <- config.minBirth
       maxBirth <- config.maxBirth
@@ -211,8 +196,9 @@ object PersistenceImage {
          Seq("Persistence bounds in config are invalid.")
        else Seq.empty[String])
 
-    if (errors.isEmpty) Success(())
-    else Failure(new IllegalArgumentException(errors.mkString(" ")))
+    if (errors.nonEmpty) {
+      throw new IllegalArgumentException(errors.mkString(" "))
+    }
   }
 
 }

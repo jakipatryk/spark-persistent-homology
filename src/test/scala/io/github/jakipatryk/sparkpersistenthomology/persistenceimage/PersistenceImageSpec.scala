@@ -12,7 +12,6 @@ import org.scalatest.BeforeAndAfterAll
 import org.scalatest.flatspec.AnyFlatSpec
 
 import scala.io.Source
-import scala.util.Failure
 
 class PersistenceImageSpec extends AnyFlatSpec with BeforeAndAfterAll {
 
@@ -102,17 +101,16 @@ class PersistenceImageSpec extends AnyFlatSpec with BeforeAndAfterAll {
         100,
         1.0
       )
-      assert(result.isSuccess)
 
       val fromScikitTDA =
         loadImageMatrixFromFile("/persistenceimage/image-single-dim-scikit-tda.csv")
 
-      assert(result.get.image.numRows === 100)
-      assert(result.get.image.numCols === 100)
-      assert(imagesAlmostEqual(fromScikitTDA, result.get.image))
+      assert(result.image.numRows === 100)
+      assert(result.image.numCols === 100)
+      assert(imagesAlmostEqual(fromScikitTDA, result.image))
     }
 
-  it should "return Failure when birth range of pairs is 0 and birth bounds are not specified by config" in {
+  it should "throw IllegalStateException when birth range of pairs is 0 and birth bounds are not specified by config" in {
     val singlePointPairs = Seq(
       PersistencePair(0, 0.0f, 10.0f),
       PersistencePair(0, 0.0f, 18.6f),
@@ -125,22 +123,35 @@ class PersistenceImageSpec extends AnyFlatSpec with BeforeAndAfterAll {
     val singlePointDataset = spark.createDataset(singlePointPairs)
     val boundsConfig       = BirthAndPersistenceBoundsConfig()
 
-    val result = PersistenceImage.fromPersistencePairsGaussian(
-      singlePointDataset,
-      boundsConfig,
-      100,
-      100,
-      1.0
-    )
-
-    assert(result.isFailure)
-    result match {
-      case Failure(e: IllegalStateException) =>
-        val actualMessage = e.getMessage
-        val expectedMessage = "Calculated pixel size on birth axis is incorrect. " +
-          "Please specify it by hand in config."
-        assert(actualMessage === expectedMessage)
-      case _ => fail("Expected Failure(IllegalStateException)")
+    assertThrows[IllegalStateException] {
+      PersistenceImage.fromPersistencePairsGaussian(
+        singlePointDataset,
+        boundsConfig,
+        100,
+        100,
+        1.0
+      )
     }
   }
+
+  it should "throw IllegalArgumentException when bounds in config are invalid" in {
+    val spark = sparkSession
+    import spark.implicits._
+    val ds = spark.createDataset(birthDeathPairs)
+    val boundsConfig = BirthAndPersistenceBoundsConfig(
+      minBirth = Some(10.0),
+      maxBirth = Some(0.0)
+    )
+
+    assertThrows[IllegalArgumentException] {
+      PersistenceImage.fromPersistencePairsGaussian(
+        ds,
+        boundsConfig,
+        100,
+        100,
+        1.0
+      )
+    }
+  }
+
 }
