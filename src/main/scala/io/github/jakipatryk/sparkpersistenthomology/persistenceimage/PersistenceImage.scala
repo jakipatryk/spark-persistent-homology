@@ -74,17 +74,20 @@ object PersistenceImage {
         "Calculated pixel size on persistence axis is incorrect. Please specify it by hand in config."
       )
     } else {
-      val aggregator = new PersistenceImageAggregator(
-        numberOfPixelsOnBirthAxis,
-        numberOfPixelsOnPersistenceAxis,
-        birthAxisPixelSize,
-        persistenceAxisPixelSize,
-        birthBound.min,
-        persistenceBound.min,
-        influenceDistribution,
-        weightingFunction,
-        monteCarloIntegrationSamplesPerPixel
-      )
+      val aggregator = {
+        import finitePairs.sparkSession.implicits._
+        new PersistenceImageAggregator(
+          numberOfPixelsOnBirthAxis,
+          numberOfPixelsOnPersistenceAxis,
+          birthAxisPixelSize,
+          persistenceAxisPixelSize,
+          birthBound.min,
+          persistenceBound.min,
+          influenceDistribution,
+          weightingFunction,
+          monteCarloIntegrationSamplesPerPixel
+        )
+      }
 
       val imageMatrix = finitePairs.select(aggregator.toColumn).head()
 

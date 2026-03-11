@@ -20,7 +20,8 @@ private[sparkpersistenthomology] class PersistenceImageAggregator(
   influenceDistribution: InfluenceDistribution,
   weightingFunction: WeightingFunction,
   monteCarloIntegrationSamplesPerPixel: Int
-) extends Aggregator[PersistencePair, Array[Double], DenseMatrix] {
+)(implicit arrayDoubleEncoder: Encoder[Array[Double]])
+    extends Aggregator[PersistencePair, Array[Double], DenseMatrix] {
 
   override def zero: Array[Double] =
     Array.fill(numberOfPixelsOnBirthAxis * numberOfPixelsOnPersistenceAxis)(0.0)
@@ -69,7 +70,7 @@ private[sparkpersistenthomology] class PersistenceImageAggregator(
     new DenseMatrix(numberOfPixelsOnBirthAxis, numberOfPixelsOnPersistenceAxis, reduction)
   }
 
-  override def bufferEncoder: Encoder[Array[Double]] = Encoders.kryo[Array[Double]]
+  override def bufferEncoder: Encoder[Array[Double]] = arrayDoubleEncoder
 
   override def outputEncoder: Encoder[DenseMatrix] = Encoders.kryo[DenseMatrix]
 }

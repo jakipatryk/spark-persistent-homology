@@ -6,10 +6,13 @@ import io.github.jakipatryk.sparkpersistenthomology.persistenceimage.{
   WeightingFunction
 }
 import org.apache.spark.ml.linalg.DenseMatrix
+import org.apache.spark.sql.Encoders
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
 
 class PersistenceImageAggregatorSpec extends AnyFlatSpec with Matchers {
+
+  implicit val encoder = Encoders.kryo[Array[Double]]
 
   class ConstantInfluenceDistribution(value: Double) extends InfluenceDistribution {
     override def compute(center: (Double, Double), point: (Double, Double)): Double = value
