@@ -5,7 +5,7 @@ package io.github.jakipatryk.sparkpersistenthomology.internal.utils
   * @param combinationElementsSetSize
   *   Number of elements of the (ordered) multiset for which combinations are produced.
   * @param combinationSize
-  *   The size of the combinations produced (i.e., k).
+  *   The size of the combinations produced.
   */
 private[sparkpersistenthomology] class CombinatorialNumberSystem(
   combinationElementsSetSize: Int,
