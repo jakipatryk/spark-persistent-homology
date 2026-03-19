@@ -89,7 +89,7 @@ private[sparkpersistenthomology] class PivotChunksStatisticsAccumulator(
           i += 1
         }
       case _ =>
-        throw new UnsupportedOperationException(s"Cannot merge with \${other.getClass.getName}")
+        throw new UnsupportedOperationException(s"Cannot merge with ${other.getClass.getName}")
     }
   }
 
