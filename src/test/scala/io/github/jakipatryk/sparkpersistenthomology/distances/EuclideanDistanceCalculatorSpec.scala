@@ -1,24 +1,9 @@
 package io.github.jakipatryk.sparkpersistenthomology.distances
 
 import io.github.jakipatryk.sparkpersistenthomology.distances.DistanceCalculator.EuclideanDistanceCalculator
-import org.apache.spark.{ SparkConf, SparkContext }
-import org.scalatest.BeforeAndAfterAll
 import org.scalatest.flatspec.AnyFlatSpec
 
-class EuclideanDistanceCalculatorSpec extends AnyFlatSpec with BeforeAndAfterAll {
-
-  var sparkContext: SparkContext = _
-
-  override def beforeAll(): Unit = {
-    sparkContext = new SparkContext(
-      new SparkConf().setAppName("EuclideanDistanceCalculatorSpec").setMaster("local[*]")
-    )
-    sparkContext.setLogLevel("ERROR")
-  }
-
-  override def afterAll(): Unit = {
-    sparkContext.stop()
-  }
+class EuclideanDistanceCalculatorSpec extends AnyFlatSpec {
 
   "calculateDistance" should "return 0 when two arrays are the same" in {
     val array = Array(0.0f, 1.1f, 2.2f, 3.3f)

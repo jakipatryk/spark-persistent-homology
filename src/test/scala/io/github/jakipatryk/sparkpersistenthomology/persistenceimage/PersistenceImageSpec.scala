@@ -1,30 +1,16 @@
 package io.github.jakipatryk.sparkpersistenthomology.persistenceimage
 
-import io.github.jakipatryk.sparkpersistenthomology.PersistencePair
+import io.github.jakipatryk.sparkpersistenthomology.{ PersistencePair, SharedSparkContext }
 import org.apache.spark.ml.linalg.DenseMatrix
-import org.apache.spark.sql.{ Dataset, SparkSession }
+import org.apache.spark.sql.Dataset
 import org.scalactic.{ Equality, TolerantNumerics }
-import org.scalatest.BeforeAndAfterAll
 import org.scalatest.flatspec.AnyFlatSpec
 
 import scala.io.Source
 
-class PersistenceImageSpec extends AnyFlatSpec with BeforeAndAfterAll {
+class PersistenceImageSpec extends AnyFlatSpec with SharedSparkContext {
 
-  implicit var sparkSession: SparkSession = _
-
-  override def beforeAll(): Unit = {
-    sparkSession = SparkSession
-      .builder()
-      .appName("PersistenceImageSpec")
-      .master("local[*]")
-      .getOrCreate()
-    sparkSession.sparkContext.setLogLevel("ERROR")
-  }
-
-  override def afterAll(): Unit = {
-    sparkSession.stop()
-  }
+  import spark.implicits._
 
   behavior of "fromPersistencePairs"
 
@@ -38,8 +24,6 @@ class PersistenceImageSpec extends AnyFlatSpec with BeforeAndAfterAll {
   )
 
   def birthDeathPairsDataset: Dataset[PersistencePair] = {
-    val spark = sparkSession
-    import spark.implicits._
     spark.createDataset(birthDeathPairs)
   }
 
@@ -114,8 +98,6 @@ class PersistenceImageSpec extends AnyFlatSpec with BeforeAndAfterAll {
       PersistencePair(0, 0.0f, 15.0f),
       PersistencePair(0, 0.0f, PersistencePair.Infinity)
     )
-    val spark = sparkSession
-    import spark.implicits._
     val singlePointDataset = spark.createDataset(singlePointPairs)
     val boundsConfig       = BirthAndPersistenceBoundsConfig()
 
@@ -131,8 +113,6 @@ class PersistenceImageSpec extends AnyFlatSpec with BeforeAndAfterAll {
   }
 
   it should "throw IllegalArgumentException when bounds in config are invalid" in {
-    val spark = sparkSession
-    import spark.implicits._
     val ds = spark.createDataset(birthDeathPairs)
     val boundsConfig = BirthAndPersistenceBoundsConfig(
       minBirth = Some(10.0),
