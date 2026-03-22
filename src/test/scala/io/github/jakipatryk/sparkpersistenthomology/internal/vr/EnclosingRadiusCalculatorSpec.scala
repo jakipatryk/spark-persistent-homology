@@ -7,10 +7,10 @@ import org.scalatest.matchers.should.Matchers
 
 class EnclosingRadiusCalculatorSpec extends AnyFlatSpec with SharedSparkContext with Matchers {
 
+  import spark.implicits._
+
   "computeRadius" should "return 0.0f for an empty point cloud" in {
-    val spark = sparkSession
-    import spark.implicits._
-    val pointsCloud       = sparkSession.emptyDataset[Array[Float]]
+    val pointsCloud       = spark.emptyDataset[Array[Float]]
     val broadcastedPoints = sparkContext.broadcast(Array.empty[Array[Float]])
 
     val radius = EnclosingRadiusCalculator.computeRadius(
@@ -23,8 +23,6 @@ class EnclosingRadiusCalculatorSpec extends AnyFlatSpec with SharedSparkContext 
   }
 
   it should "return 0.0f for a single point cloud" in {
-    val spark = sparkSession
-    import spark.implicits._
     val localPoints       = Array(Array(1.0f, 2.0f, 3.0f))
     val pointsCloud       = sparkContext.parallelize(localPoints).toDS()
     val broadcastedPoints = sparkContext.broadcast(localPoints)
@@ -39,8 +37,6 @@ class EnclosingRadiusCalculatorSpec extends AnyFlatSpec with SharedSparkContext 
   }
 
   it should "calculate correct enclosing radius for an equilateral triangle" in {
-    val spark = sparkSession
-    import spark.implicits._
     // Triangle with side length 1.0. Vertices: (0,0), (1,0), (0.5, sqrt(3)/2)
     val localPoints = Array(
       Array(0.0f, 0.0f),
@@ -61,8 +57,6 @@ class EnclosingRadiusCalculatorSpec extends AnyFlatSpec with SharedSparkContext 
   }
 
   it should "calculate correct enclosing radius for a regular hexagon (more than 5 points)" in {
-    val spark = sparkSession
-    import spark.implicits._
     // Regular hexagon with side length 1.0, centered at origin
     val localPoints = Array(
       Array(1.0f, 0.0f),
@@ -86,8 +80,6 @@ class EnclosingRadiusCalculatorSpec extends AnyFlatSpec with SharedSparkContext 
   }
 
   it should "calculate correct enclosing radius for points on a straight line" in {
-    val spark = sparkSession
-    import spark.implicits._
     // Points: (0,0), (1,0), (2,0), (3,0)
     val localPoints = Array(
       Array(0.0f, 0.0f),
@@ -114,8 +106,6 @@ class EnclosingRadiusCalculatorSpec extends AnyFlatSpec with SharedSparkContext 
   }
 
   it should "calculate correct enclosing radius for a star-shaped cluster" in {
-    val spark = sparkSession
-    import spark.implicits._
     // Center point (0,0) surrounded by points at distance 5.0
     val localPoints = Array(
       Array(0.0f, 0.0f), // center

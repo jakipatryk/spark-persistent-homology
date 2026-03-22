@@ -6,25 +6,21 @@ import org.scalatest.{ BeforeAndAfterAll, Suite }
 
 trait SharedSparkContext extends BeforeAndAfterAll { self: Suite =>
 
-  implicit var sparkSession: SparkSession = _
-
-  def sparkContext: SparkContext = sparkSession.sparkContext
-
-  override def beforeAll(): Unit = {
-    sparkSession = SparkSession
+  implicit lazy val spark: SparkSession = {
+    val s = SparkSession
       .builder()
       .appName(self.getClass.getSimpleName)
       .master("local[*]")
       .getOrCreate()
-    sparkContext.setLogLevel("ERROR")
-    super.beforeAll()
+    s.sparkContext.setLogLevel("ERROR")
+    s
   }
+
+  def sparkContext: SparkContext = spark.sparkContext
 
   override def afterAll(): Unit = {
     try {
-      if (sparkSession != null) {
-        sparkSession.stop()
-      }
+      spark.stop()
     } finally {
       super.afterAll()
     }

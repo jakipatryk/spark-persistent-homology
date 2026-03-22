@@ -10,6 +10,8 @@ import scala.io.Source
 
 class PersistenceImageSpec extends AnyFlatSpec with SharedSparkContext {
 
+  import spark.implicits._
+
   behavior of "fromPersistencePairs"
 
   val birthDeathPairs: List[PersistencePair] = List(
@@ -22,8 +24,6 @@ class PersistenceImageSpec extends AnyFlatSpec with SharedSparkContext {
   )
 
   def birthDeathPairsDataset: Dataset[PersistencePair] = {
-    val spark = sparkSession
-    import spark.implicits._
     spark.createDataset(birthDeathPairs)
   }
 
@@ -98,8 +98,6 @@ class PersistenceImageSpec extends AnyFlatSpec with SharedSparkContext {
       PersistencePair(0, 0.0f, 15.0f),
       PersistencePair(0, 0.0f, PersistencePair.Infinity)
     )
-    val spark = sparkSession
-    import spark.implicits._
     val singlePointDataset = spark.createDataset(singlePointPairs)
     val boundsConfig       = BirthAndPersistenceBoundsConfig()
 
@@ -115,8 +113,6 @@ class PersistenceImageSpec extends AnyFlatSpec with SharedSparkContext {
   }
 
   it should "throw IllegalArgumentException when bounds in config are invalid" in {
-    val spark = sparkSession
-    import spark.implicits._
     val ds = spark.createDataset(birthDeathPairs)
     val boundsConfig = BirthAndPersistenceBoundsConfig(
       minBirth = Some(10.0),
