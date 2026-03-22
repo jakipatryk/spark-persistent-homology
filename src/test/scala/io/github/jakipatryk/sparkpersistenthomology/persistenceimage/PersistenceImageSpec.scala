@@ -1,30 +1,14 @@
 package io.github.jakipatryk.sparkpersistenthomology.persistenceimage
 
-import io.github.jakipatryk.sparkpersistenthomology.PersistencePair
+import io.github.jakipatryk.sparkpersistenthomology.{ PersistencePair, SharedSparkContext }
 import org.apache.spark.ml.linalg.DenseMatrix
-import org.apache.spark.sql.{ Dataset, SparkSession }
+import org.apache.spark.sql.Dataset
 import org.scalactic.{ Equality, TolerantNumerics }
-import org.scalatest.BeforeAndAfterAll
 import org.scalatest.flatspec.AnyFlatSpec
 
 import scala.io.Source
 
-class PersistenceImageSpec extends AnyFlatSpec with BeforeAndAfterAll {
-
-  implicit var sparkSession: SparkSession = _
-
-  override def beforeAll(): Unit = {
-    sparkSession = SparkSession
-      .builder()
-      .appName("PersistenceImageSpec")
-      .master("local[*]")
-      .getOrCreate()
-    sparkSession.sparkContext.setLogLevel("ERROR")
-  }
-
-  override def afterAll(): Unit = {
-    sparkSession.stop()
-  }
+class PersistenceImageSpec extends AnyFlatSpec with SharedSparkContext {
 
   behavior of "fromPersistencePairs"
 
