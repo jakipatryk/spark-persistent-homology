@@ -1,10 +1,9 @@
 package io.github.jakipatryk.sparkpersistenthomology.distances
 
-import io.github.jakipatryk.sparkpersistenthomology.SharedSparkContext
 import io.github.jakipatryk.sparkpersistenthomology.distances.DistanceCalculator.EuclideanDistanceCalculator
 import org.scalatest.flatspec.AnyFlatSpec
 
-class EuclideanDistanceCalculatorSpec extends AnyFlatSpec with SharedSparkContext {
+class EuclideanDistanceCalculatorSpec extends AnyFlatSpec {
 
   "calculateDistance" should "return 0 when two arrays are the same" in {
     val array = Array(0.0f, 1.1f, 2.2f, 3.3f)
