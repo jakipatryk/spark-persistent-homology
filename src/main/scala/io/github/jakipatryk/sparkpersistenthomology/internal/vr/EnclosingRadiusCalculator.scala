@@ -1,6 +1,7 @@
 package io.github.jakipatryk.sparkpersistenthomology.internal.vr
 
 import org.apache.spark.sql.Dataset
+import org.apache.spark.broadcast.Broadcast
 import io.github.jakipatryk.sparkpersistenthomology.distances.DistanceCalculator
 
 object EnclosingRadiusCalculator {
@@ -14,7 +15,22 @@ object EnclosingRadiusCalculator {
     */
   def computeRadius(
     pointsCloud: Dataset[Array[Float]],
+    broadcastedPoints: Broadcast[Array[Array[Float]]],
     distanceCalculator: DistanceCalculator
-  ): Float = ???
+  ): Float = {
+    if (pointsCloud.isEmpty) {
+      return 0.0f
+    }
+
+    import org.apache.spark.sql.functions.min
+    import pointsCloud.sparkSession.implicits._
+
+    pointsCloud.map { p =>
+      broadcastedPoints.value.map(distanceCalculator.calculateDistance(p, _)).max
+    }
+      .agg(min("value"))
+      .as[Float]
+      .first()
+  }
 
 }
