@@ -76,6 +76,20 @@ private[sparkpersistenthomology] class CombinatorialNumberSystem(
     combination
   }
 
+  /** Computes the index in lexicographical order for a given combination. Combination must be
+    * sorted in descending order.
+    */
+  def getIndexFromCombination(combination: Array[Int]): Long = {
+    var index = 0L
+    var i     = 0
+    while (i < combinationSize) {
+      val k = combinationSize - i
+      index += combinationsLookup(combination(i), k)
+      i += 1
+    }
+    index
+  }
+
   /** Returns an iterator of combinations in lexicographical order starting with one with index
     * `startIndex`.
     */

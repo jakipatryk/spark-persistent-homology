@@ -4,6 +4,39 @@ import org.scalatest.flatspec.AnyFlatSpec
 
 class CombinatorialNumberSystemOnSteroidsSpec extends AnyFlatSpec {
 
+  behavior of "getIndexFromCombination"
+
+  it should "return correct index for 1-combination" in {
+    val system1 = CombinatorialNumberSystem(8, 1)
+
+    assert(system1.getIndexFromCombination(Array(0)) === 0)
+    assert(system1.getIndexFromCombination(Array(1)) === 1)
+    assert(system1.getIndexFromCombination(Array(2)) === 2)
+    assert(system1.getIndexFromCombination(Array(3)) === 3)
+    assert(system1.getIndexFromCombination(Array(4)) === 4)
+    assert(system1.getIndexFromCombination(Array(5)) === 5)
+    assert(system1.getIndexFromCombination(Array(6)) === 6)
+    assert(system1.getIndexFromCombination(Array(7)) === 7)
+  }
+
+  it should "return correct index for 2-combination" in {
+    val system2 = CombinatorialNumberSystem(8, 2)
+
+    assert(system2.getIndexFromCombination(Array(1, 0)) === 0)
+    assert(system2.getIndexFromCombination(Array(2, 0)) === 1)
+    assert(system2.getIndexFromCombination(Array(2, 1)) === 2)
+    assert(system2.getIndexFromCombination(Array(7, 6)) === 27)
+  }
+
+  it should "return correct index for 3-combination" in {
+    val system3 = CombinatorialNumberSystem(8, 3)
+
+    assert(system3.getIndexFromCombination(Array(2, 1, 0)) === 0)
+    assert(system3.getIndexFromCombination(Array(3, 1, 0)) === 1)
+    assert(system3.getIndexFromCombination(Array(3, 2, 0)) === 2)
+    assert(system3.getIndexFromCombination(Array(7, 6, 5)) === 55)
+  }
+
   behavior of "getCombinationFromIndex"
 
   it should "return good combination for 1-combination index" in {
