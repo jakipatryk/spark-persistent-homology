@@ -12,8 +12,7 @@ object CoboundaryMatrixConstructor {
     * apparent pairs).
     */
   def construct(
-    combinatorialNumberSystem: CombinatorialNumberSystem,
-    nextDimCombinatorialNumberSystem: CombinatorialNumberSystem,
+    cns: CombinatorialNumberSystem,
     distanceCalculator: DistanceCalculator,
     distanceThreshold: Float,
     previousDimPivots: Option[Dataset[Long]] = None
