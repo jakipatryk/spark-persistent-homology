@@ -13,9 +13,10 @@ private[sparkpersistenthomology] case class Simplex(index: Long, dim: Byte, radi
     */
   def getFacets(implicit context: FiltrationContext): Iterator[Simplex] = {
     val simplexCombinationSize = dimToCombinationSize(dim)
-    val simplexCombination     = context.cns.getCombinationFromIndex(index, simplexCombinationSize)
+    val simplexCombination =
+      context.cns.value.getCombinationFromIndex(index, simplexCombinationSize)
 
-    context.cns.subcombinationsIterator(simplexCombination).map {
+    context.cns.value.subcombinationsIterator(simplexCombination).map {
       case (facetIndex, facetCombination, _) =>
         val maxDistance = computeCombinationRadius(facetCombination)
         Simplex(facetIndex, (dim - 1).toByte, maxDistance)
@@ -32,9 +33,10 @@ private[sparkpersistenthomology] case class Simplex(index: Long, dim: Byte, radi
     */
   def getCofacets(implicit context: FiltrationContext): Iterator[Simplex] = {
     val simplexCombinationSize = dimToCombinationSize(dim)
-    val simplexCombination     = context.cns.getCombinationFromIndex(index, simplexCombinationSize)
+    val simplexCombination =
+      context.cns.value.getCombinationFromIndex(index, simplexCombinationSize)
 
-    context.cns.supcombinationsIterator(simplexCombination).flatMap {
+    context.cns.value.supcombinationsIterator(simplexCombination).flatMap {
       case (cofacetIndex, _, addedElement) =>
         val maxDistanceToAddedPoint = computeMaxDistanceFromPoint(addedElement, simplexCombination)
         val cofacetRadius           = math.max(radius, maxDistanceToAddedPoint)

@@ -5,7 +5,7 @@ import io.github.jakipatryk.sparkpersistenthomology.distances.DistanceCalculator
 import io.github.jakipatryk.sparkpersistenthomology.internal.utils.CombinatorialNumberSystem
 
 private[sparkpersistenthomology] case class FiltrationContext(
-  cns: CombinatorialNumberSystem,
+  cns: Broadcast[CombinatorialNumberSystem],
   pointsCloud: Broadcast[Array[Array[Float]]],
   distanceCalculator: DistanceCalculator,
   distanceThreshold: Float

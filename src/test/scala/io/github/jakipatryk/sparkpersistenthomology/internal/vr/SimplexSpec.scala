@@ -24,7 +24,7 @@ class SimplexSpec extends AnyFlatSpec with SharedSparkContext {
 
     implicit val context =
       FiltrationContext(
-        cns,
+        sparkContext.broadcast(cns),
         sparkContext.broadcast(pointsCloud),
         distanceCalculator,
         Float.PositiveInfinity
@@ -66,7 +66,7 @@ class SimplexSpec extends AnyFlatSpec with SharedSparkContext {
 
     implicit val context =
       FiltrationContext(
-        cns,
+        sparkContext.broadcast(cns),
         sparkContext.broadcast(pointsCloud5),
         distanceCalculator,
         Float.PositiveInfinity
@@ -107,7 +107,12 @@ class SimplexSpec extends AnyFlatSpec with SharedSparkContext {
 
     // Set threshold to 5.0f, which is smaller than the distance to point 4 (~14.14f)
     implicit val context =
-      FiltrationContext(cns, sparkContext.broadcast(pointsCloud5), distanceCalculator, 5.0f)
+      FiltrationContext(
+        sparkContext.broadcast(cns),
+        sparkContext.broadcast(pointsCloud5),
+        distanceCalculator,
+        5.0f
+      )
 
     val simplex  = Simplex(index = 0L, dim = simplexDim, radius = 1.0f)
     val iterator = simplex.getCofacets
