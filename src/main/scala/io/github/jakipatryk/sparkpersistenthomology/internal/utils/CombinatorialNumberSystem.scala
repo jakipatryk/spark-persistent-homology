@@ -12,6 +12,8 @@ private[sparkpersistenthomology] class CombinatorialNumberSystem(
   val maxCombinationSize: Int
 ) extends Serializable {
 
+  import CombinatorialNumberSystem._
+
   private[sparkpersistenthomology] val combinationsLookup: LocalMatrix[Long] = {
     val matrix = LocalMatrix.zero[Long](combinationElementsSetSize + 1, maxCombinationSize + 1)
 
@@ -43,7 +45,7 @@ private[sparkpersistenthomology] class CombinatorialNumberSystem(
     *   val system = new CombinatorialNumberSystemOnSteroids(10, 2)
     *   system.getCombinationFromIndex(0, 2) // (1, 0)
     */
-  def getCombinationFromIndex(index: Long, combinationSize: Int): Array[Int] = {
+  def getCombinationFromIndex(index: Index, combinationSize: Int): Combination = {
     val count = allCombinationsCount(combinationSize)
     if (index < 0 || index >= count) {
       throw new IndexOutOfBoundsException(
@@ -81,7 +83,7 @@ private[sparkpersistenthomology] class CombinatorialNumberSystem(
   /** Computes the index in lexicographical order for a given combination. Combination must be
     * sorted in descending order.
     */
-  def getIndexFromCombination(combination: Array[Int]): Long = {
+  def getIndexFromCombination(combination: Combination): Index = {
     val combinationSize = combination.length
     var index           = 0L
     var i               = 0
@@ -96,7 +98,7 @@ private[sparkpersistenthomology] class CombinatorialNumberSystem(
   /** Returns an iterator of combinations in lexicographical order starting with one with index
     * `startIndex`.
     */
-  def combinationsIterator(startIndex: Long, combinationSize: Int): Iterator[Array[Int]] =
+  def combinationsIterator(startIndex: Index, combinationSize: Int): Iterator[Combination] =
     new Iterator[Array[Int]] {
       private val count                                  = allCombinationsCount(combinationSize)
       private var currentIndex                           = startIndex - 1
@@ -130,9 +132,99 @@ private[sparkpersistenthomology] class CombinatorialNumberSystem(
       }
     }
 
+  /** Returns an iterator with all subcombinations (of length of input combination -1) of a given
+    * combination.
+    *
+    * The elements are returned in ascending order in order of the Combinatorial Number System.
+    *
+    * Tuple in the iterator represents the following:
+    *   - `Index` - index of the subcombination in CNS
+    *   - `Combination` - the subcombination
+    *   - `Int` - the element that was removed
+    */
+  def subcombinationsIterator(combination: Combination): Iterator[(Index, Combination, Int)] = {
+    val n = combination.length
+
+    new Iterator[(Index, Combination, Int)] {
+      private var i = 0
+
+      override def hasNext: Boolean = i < n
+
+      override def next(): (Index, Combination, Int) = {
+        val sub = new Array[Int](n - 1)
+        System.arraycopy(combination, 0, sub, 0, i)
+        System.arraycopy(combination, i + 1, sub, i, n - 1 - i)
+
+        val index          = getIndexFromCombination(sub)
+        val removedElement = combination(i)
+        i += 1
+        (index, sub, removedElement)
+      }
+    }
+  }
+
+  /** Returns an iterator with all supcombinations (of length of input combination +1) of a given
+    * combination.
+    *
+    * The elements are returned in descending order in order of the Combinatiorial Number System.
+    *
+    * Tuple in the iterator represents the following:
+    *   - `Index` - index of the supcombination in CNS
+    *   - `Combination` - the supcombination
+    *   - `Int` - the element that was added
+    */
+  def supcombinationsIterator(combination: Combination): Iterator[(Index, Combination, Int)] = {
+    val n = combination.length
+
+    new Iterator[(Index, Combination, Int)] {
+      private var currentElementToAdd = combinationElementsSetSize - 1
+      private var combinationIndex    = 0
+
+      private def advance(): Unit = {
+        while (
+          currentElementToAdd >= 0 &&
+          combinationIndex < n &&
+          combination(combinationIndex) == currentElementToAdd
+        ) {
+          currentElementToAdd -= 1
+          combinationIndex += 1
+        }
+      }
+
+      advance()
+
+      override def hasNext: Boolean = currentElementToAdd >= 0
+
+      override def next(): (Index, Combination, Int) = {
+        val sup          = new Array[Int](n + 1)
+        val addedElement = currentElementToAdd
+
+        System.arraycopy(combination, 0, sup, 0, combinationIndex)
+        sup(combinationIndex) = addedElement
+        System.arraycopy(
+          combination,
+          combinationIndex,
+          sup,
+          combinationIndex + 1,
+          n - combinationIndex
+        )
+
+        val index = getIndexFromCombination(sup)
+
+        currentElementToAdd -= 1
+        advance()
+
+        (index, sup, addedElement)
+      }
+    }
+  }
+
 }
 
 private[sparkpersistenthomology] object CombinatorialNumberSystem {
+
+  type Index       = Long
+  type Combination = Array[Int]
 
   def apply(
     combinationElementsSetSize: Int,

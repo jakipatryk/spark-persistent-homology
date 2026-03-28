@@ -173,4 +173,102 @@ class CombinatorialNumberSystemOnSteroidsSpec extends AnyFlatSpec {
     assert(actualIterator.map(_.toList).toList === expectedIterator.map(_.toList).toList)
   }
 
+  behavior of "subcombinationsIterator"
+
+  it should "return correct subcombinations for 3-combination" in {
+    val system      = CombinatorialNumberSystem(8, 3)
+    val combination = Array(3, 2, 0)
+    val expected = List(
+      (1L, Array(2, 0), 3),
+      (3L, Array(3, 0), 2),
+      (5L, Array(3, 2), 0)
+    )
+
+    val actual = system
+      .subcombinationsIterator(combination)
+      .map { case (idx, arr, removedElement) =>
+        (idx, arr.toList, removedElement)
+      }
+      .toList
+
+    val expectedList = expected.map { case (idx, arr, removedElement) =>
+      (idx, arr.toList, removedElement)
+    }
+    assert(actual === expectedList)
+  }
+
+  it should "return correct subcombinations for 2-combination" in {
+    val system      = CombinatorialNumberSystem(8, 3)
+    val combination = Array(4, 2)
+    val expected = List(
+      (2L, Array(2), 4),
+      (4L, Array(4), 2)
+    )
+
+    val actual = system
+      .subcombinationsIterator(combination)
+      .map { case (idx, arr, removedElement) =>
+        (idx, arr.toList, removedElement)
+      }
+      .toList
+
+    val expectedList = expected.map { case (idx, arr, removedElement) =>
+      (idx, arr.toList, removedElement)
+    }
+    assert(actual === expectedList)
+  }
+
+  behavior of "supcombinationsIterator"
+
+  it should "return correct supcombinations for 2-combination" in {
+    val system      = CombinatorialNumberSystem(8, 3)
+    val combination = Array(2, 0) // index 1
+    val expected = List(
+      (36L, Array(7, 2, 0), 7),
+      (21L, Array(6, 2, 0), 6),
+      (11L, Array(5, 2, 0), 5),
+      (5L, Array(4, 2, 0), 4),
+      (2L, Array(3, 2, 0), 3),
+      (0L, Array(2, 1, 0), 1)
+    )
+
+    val actual = system
+      .supcombinationsIterator(combination)
+      .map { case (idx, arr, addedElement) =>
+        (idx, arr.toList, addedElement)
+      }
+      .toList
+
+    val expectedList = expected.map { case (idx, arr, addedElement) =>
+      (idx, arr.toList, addedElement)
+    }
+    assert(actual === expectedList)
+  }
+
+  it should "return correct supcombinations for 1-combination" in {
+    val system      = CombinatorialNumberSystem(8, 3)
+    val combination = Array(2)
+    val expected = List(
+      (23L, Array(7, 2), 7),
+      (17L, Array(6, 2), 6),
+      (12L, Array(5, 2), 5),
+      (8L, Array(4, 2), 4),
+      (5L, Array(3, 2), 3),
+      (2L, Array(2, 1), 1),
+      (1L, Array(2, 0), 0)
+    )
+
+    val actual = system
+      .supcombinationsIterator(combination)
+      .map { case (idx, arr, addedElement) =>
+        (idx, arr.toList, addedElement)
+      }
+      .toList
+
+    val expectedList = expected.map { case (idx, arr, addedElement) =>
+      (idx, arr.toList, addedElement)
+    }
+    assert(actual === expectedList)
+  }
+
 }
