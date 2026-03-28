@@ -4,112 +4,88 @@ private[sparkpersistenthomology] case class Simplex(index: Long, dim: Byte, radi
 
   import Simplex._
 
+  /** Returns an iterator over all facets of this simplex.
+    *
+    * Facets are returned in ascending order of their indices in the Combinatorial Number System.
+    *
+    * @return
+    *   An iterator of facets (simplices of dimension `dim - 1`).
+    */
   def getFacets(implicit context: FiltrationContext): Iterator[Simplex] = {
     val simplexCombinationSize = dimToCombinationSize(dim)
-    val facetCombinationSize   = dimToCombinationSize((dim - 1).toByte)
-    val simplex                = context.cns.getCombinationFromIndex(index, simplexCombinationSize)
-    val numFacets              = simplex.length
+    val simplexCombination     = context.cns.getCombinationFromIndex(index, simplexCombinationSize)
 
-    val facets           = new Array[Simplex](numFacets)
-    val facetCombination = new Array[Int](facetCombinationSize)
-
-    var i = 0
-    while (i < numFacets) {
-      // Remove i-th vertex
-      var j = 0
-      var k = 0
-      while (j < numFacets) {
-        if (j != i) {
-          facetCombination(k) = simplex(j)
-          k += 1
-        }
-        j += 1
-      }
-      val facetIndex = context.cns.getIndexFromCombination(facetCombination)
-
-      // Calculate radius of this facet
-      var maxDistance = 0.0f
-      var u           = 0
-      while (u < facetCombination.length) {
-        var v = u + 1
-        while (v < facetCombination.length) {
-          val dist = context.distanceCalculator.calculateDistance(
-            context.pointsCloud.value(facetCombination(u)),
-            context.pointsCloud.value(facetCombination(v))
-          )
-          if (dist > maxDistance) {
-            maxDistance = dist
-          }
-          v += 1
-        }
-        u += 1
-      }
-
-      facets(i) = Simplex(facetIndex, (dim - 1).toByte, maxDistance)
-      i += 1
+    context.cns.subcombinationsIterator(simplexCombination).map {
+      case (facetIndex, facetCombination, _) =>
+        val maxDistance = computeCombinationRadius(facetCombination)
+        Simplex(facetIndex, (dim - 1).toByte, maxDistance)
     }
-
-    facets.sortBy(_.radius).iterator
   }
 
+  /** Returns an iterator over all cofacets of this simplex that have radius within the distance
+    * threshold.
+    *
+    * Cofacets are returned in descending order of their indices in the Combinatorial Number System.
+    *
+    * @return
+    *   An iterator of cofacets (simplices of dimension `dim + 1`).
+    */
   def getCofacets(implicit context: FiltrationContext): Iterator[Simplex] = {
     val simplexCombinationSize = dimToCombinationSize(dim)
-    val cofacetCombinationSize = dimToCombinationSize((dim + 1).toByte)
-    val simplex                = context.cns.getCombinationFromIndex(index, simplexCombinationSize)
+    val simplexCombination     = context.cns.getCombinationFromIndex(index, simplexCombinationSize)
 
-    val numPoints = context.pointsCloud.value.length
-    val cofacets  = new scala.collection.mutable.ArrayBuffer[Simplex](numPoints - simplex.length)
-    val cofacetCombination = new Array[Int](cofacetCombinationSize)
+    context.cns.supcombinationsIterator(simplexCombination).flatMap {
+      case (cofacetIndex, _, addedElement) =>
+        val maxDistanceToAddedPoint = computeMaxDistanceFromPoint(addedElement, simplexCombination)
+        val cofacetRadius           = math.max(radius, maxDistanceToAddedPoint)
 
-    var v = 0
-    while (v < numPoints) {
-      // Check if v is in simplex
-      var isVInSimplex = false
-      var i            = 0
-      while (i < simplex.length && !isVInSimplex) {
-        if (simplex(i) == v) isVInSimplex = true
-        i += 1
-      }
-
-      if (!isVInSimplex) {
-        // Compute radius of cofacet
-        var maxDistanceToV = 0.0f
-        i = 0
-        while (i < simplex.length) {
-          val dist = context.distanceCalculator.calculateDistance(
-            context.pointsCloud.value(v),
-            context.pointsCloud.value(simplex(i))
-          )
-          if (dist > maxDistanceToV) {
-            maxDistanceToV = dist
-          }
-          i += 1
+        if (cofacetRadius <= context.distanceThreshold) {
+          Some(Simplex(cofacetIndex, (dim + 1).toByte, cofacetRadius))
+        } else {
+          None
         }
-        val cofacetRadius = math.max(radius, maxDistanceToV)
-
-        // Insert v into cofacetCombination maintaining descending order
-        i = 0
-        var j         = 0
-        var vInserted = false
-        while (i < cofacetCombination.length) {
-          if (!vInserted && (j == simplex.length || v > simplex(j))) {
-            cofacetCombination(i) = v
-            vInserted = true
-          } else {
-            cofacetCombination(i) = simplex(j)
-            j += 1
-          }
-          i += 1
-        }
-
-        val cofacetIndex = context.cns.getIndexFromCombination(cofacetCombination)
-        cofacets += Simplex(cofacetIndex, (dim + 1).toByte, cofacetRadius)
-      }
-      v += 1
     }
+  }
 
-    // Sort descending by radius
-    cofacets.sortBy(c => -c.radius).iterator
+  private def computeCombinationRadius(
+    combination: Array[Int]
+  )(implicit context: FiltrationContext): Float = {
+    var maxDistance = 0.0f
+    var u           = 0
+    while (u < combination.length) {
+      var v = u + 1
+      while (v < combination.length) {
+        val dist = context.distanceCalculator.calculateDistance(
+          context.pointsCloud.value(combination(u)),
+          context.pointsCloud.value(combination(v))
+        )
+        if (dist > maxDistance) {
+          maxDistance = dist
+        }
+        v += 1
+      }
+      u += 1
+    }
+    maxDistance
+  }
+
+  private def computeMaxDistanceFromPoint(
+    pointIndex: Int,
+    combination: Array[Int]
+  )(implicit context: FiltrationContext): Float = {
+    var maxDistanceToPoint = 0.0f
+    var i                  = 0
+    while (i < combination.length) {
+      val dist = context.distanceCalculator.calculateDistance(
+        context.pointsCloud.value(pointIndex),
+        context.pointsCloud.value(combination(i))
+      )
+      if (dist > maxDistanceToPoint) {
+        maxDistanceToPoint = dist
+      }
+      i += 1
+    }
+    maxDistanceToPoint
   }
 
 }
