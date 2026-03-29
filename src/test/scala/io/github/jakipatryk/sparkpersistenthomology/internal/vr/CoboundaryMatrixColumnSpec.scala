@@ -278,4 +278,176 @@ class CoboundaryMatrixColumnSpec extends AnyFlatSpec with SharedSparkContext {
 
     assert(elements2 === expected)
   }
+
+  behavior of "+"
+
+  it should "add two columns using fast addition on valueTopEntries when fast sum >= MinTopEntries" in {
+    val distanceCalculator = DistanceCalculator.EuclideanDistanceCalculator
+    // 10 points on a line to ensure many cofacets with distinct radii/indices
+    val pointsCloud      = Array.tabulate(10)(i => Array(i.toFloat, 0.0f))
+    val cns              = CombinatorialNumberSystem(10, 3)
+    val simplexDim: Byte = 1
+
+    implicit val context: FiltrationContext =
+      FiltrationContext(
+        sparkContext.broadcast(cns),
+        sparkContext.broadcast(pointsCloud),
+        distanceCalculator,
+        Float.PositiveInfinity
+      )
+
+    // col1: [1, 0]. Cofacets: [2,1,0], [3,1,0], ..., [9,1,0] (8 cofacets)
+    val initial1    = Simplex(index = 0L, dim = simplexDim, radius = 1.0f)
+    val topEntries1 = CoboundaryMatrixColumn.resolveInitialCoboundary(initial1).dequeueAll.toArray
+
+    val col1 = CoboundaryMatrixColumn(
+      initialSimplex = initial1,
+      simplicesAdded = Array.empty,
+      valueTopEntries = topEntries1
+    )
+
+    // col2: [2, 0]. Cofacets: [2,1,0], [3,2,0], ..., [9,2,0] (8 cofacets)
+    // [2,1,0] is common and will cancel out.
+    val initial2    = Simplex(index = 1L, dim = simplexDim, radius = 2.0f)
+    val topEntries2 = CoboundaryMatrixColumn.resolveInitialCoboundary(initial2).dequeueAll.toArray
+
+    val col2 = CoboundaryMatrixColumn(
+      initialSimplex = initial2,
+      simplicesAdded = Array.empty,
+      valueTopEntries = topEntries2
+    )
+
+    val result = col1 + col2
+
+    assert(result.initialSimplex === initial1)
+    assert(result.simplicesAdded.toList === List(initial2))
+
+    // Fast sum should have (8-1) + (8-1) = 14 elements, which is >= 5.
+    // It should NOT have fallback.
+    assert(result.valueTopEntries.length === 14)
+
+    val expectedTopEntries = Array(
+      Simplex(84L, 2.toByte, 9.0f),
+      Simplex(85L, 2.toByte, 9.0f),
+      Simplex(56L, 2.toByte, 8.0f),
+      Simplex(57L, 2.toByte, 8.0f),
+      Simplex(35L, 2.toByte, 7.0f),
+      Simplex(36L, 2.toByte, 7.0f),
+      Simplex(20L, 2.toByte, 6.0f),
+      Simplex(21L, 2.toByte, 6.0f),
+      Simplex(10L, 2.toByte, 5.0f),
+      Simplex(11L, 2.toByte, 5.0f),
+      Simplex(4L, 2.toByte, 4.0f),
+      Simplex(5L, 2.toByte, 4.0f),
+      Simplex(1L, 2.toByte, 3.0f),
+      Simplex(2L, 2.toByte, 3.0f)
+    )
+
+    assert(result.valueTopEntries === expectedTopEntries)
+  }
+
+  it should "fallback to resolveFullColumnValue when fast sum yields few entries" in {
+    val distanceCalculator = DistanceCalculator.EuclideanDistanceCalculator
+    val pointsCloud = Array(
+      Array(0.0f, 0.0f),
+      Array(1.0f, 0.0f),
+      Array(0.0f, 1.0f),
+      Array(1.0f, 1.0f)
+    )
+    val cns              = CombinatorialNumberSystem(4, 3)
+    val simplexDim: Byte = 1
+
+    implicit val context: FiltrationContext =
+      FiltrationContext(
+        sparkContext.broadcast(cns),
+        sparkContext.broadcast(pointsCloud),
+        distanceCalculator,
+        Float.PositiveInfinity
+      )
+
+    // col1: [1, 0] (index 0). Cofacets: [2,1,0] (index 0, rad 1.414), [3,1,0] (index 1, rad 1.414)
+    val initial1    = Simplex(index = 0L, dim = simplexDim, radius = 1.0f)
+    val topEntries1 = CoboundaryMatrixColumn.resolveInitialCoboundary(initial1).dequeueAll.toArray
+
+    val col1 = CoboundaryMatrixColumn(
+      initialSimplex = initial1,
+      simplicesAdded = Array.empty,
+      valueTopEntries = topEntries1
+    )
+
+    // col2: [2, 0] (index 1). Cofacets: [2,1,0] (index 0, rad 1.414), [3,2,0] (index 2, rad 1.414)
+    val initial2    = Simplex(index = 1L, dim = simplexDim, radius = 1.0f)
+    val topEntries2 = CoboundaryMatrixColumn.resolveInitialCoboundary(initial2).dequeueAll.toArray
+
+    val col2 = CoboundaryMatrixColumn(
+      initialSimplex = initial2,
+      simplicesAdded = Array.empty,
+      valueTopEntries = topEntries2
+    )
+
+    // Sum: {[3,1,0], [3,2,0]} (length 2 < 5). Trigger fallback.
+    val result = col1 + col2
+
+    assert(result.initialSimplex === initial1)
+    assert(result.simplicesAdded.toList === List(initial2))
+
+    val expectedTopEntries = Array(
+      Simplex(1L, 2.toByte, 1.4142135f),
+      Simplex(2L, 2.toByte, 1.4142135f)
+    )
+    assert(result.valueTopEntries === expectedTopEntries)
+  }
+
+  it should "fallback to resolveFullColumnValue when valueTopEntries are empty and result in many entries" in {
+    val distanceCalculator = DistanceCalculator.EuclideanDistanceCalculator
+    val pointsCloud        = Array.tabulate(10)(i => Array(i.toFloat, 0.0f))
+    val cns                = CombinatorialNumberSystem(10, 3)
+    val simplexDim: Byte   = 1
+
+    implicit val context: FiltrationContext =
+      FiltrationContext(
+        sparkContext.broadcast(cns),
+        sparkContext.broadcast(pointsCloud),
+        distanceCalculator,
+        Float.PositiveInfinity
+      )
+
+    val initial1 = Simplex(index = 0L, dim = simplexDim, radius = 1.0f)
+    val col1 = CoboundaryMatrixColumn(
+      initialSimplex = initial1,
+      simplicesAdded = Array.empty,
+      valueTopEntries = Array.empty // Force fallback
+    )
+
+    val initial2 = Simplex(index = 1L, dim = simplexDim, radius = 2.0f)
+    val col2 = CoboundaryMatrixColumn(
+      initialSimplex = initial2,
+      simplicesAdded = Array.empty,
+      valueTopEntries = Array.empty // Force fallback
+    )
+
+    val result = col1 + col2
+
+    assert(result.initialSimplex === initial1)
+    assert(result.valueTopEntries.length === 14) // Verified in first test
+
+    val expectedTopEntries = Array(
+      Simplex(84L, 2.toByte, 9.0f),
+      Simplex(85L, 2.toByte, 9.0f),
+      Simplex(56L, 2.toByte, 8.0f),
+      Simplex(57L, 2.toByte, 8.0f),
+      Simplex(35L, 2.toByte, 7.0f),
+      Simplex(36L, 2.toByte, 7.0f),
+      Simplex(20L, 2.toByte, 6.0f),
+      Simplex(21L, 2.toByte, 6.0f),
+      Simplex(10L, 2.toByte, 5.0f),
+      Simplex(11L, 2.toByte, 5.0f),
+      Simplex(4L, 2.toByte, 4.0f),
+      Simplex(5L, 2.toByte, 4.0f),
+      Simplex(1L, 2.toByte, 3.0f),
+      Simplex(2L, 2.toByte, 3.0f)
+    )
+
+    assert(result.valueTopEntries === expectedTopEntries)
+  }
 }

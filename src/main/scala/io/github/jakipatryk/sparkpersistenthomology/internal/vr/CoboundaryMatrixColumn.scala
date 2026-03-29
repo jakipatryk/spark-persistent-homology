@@ -1,6 +1,7 @@
 package io.github.jakipatryk.sparkpersistenthomology.internal.vr
 
 import scala.collection.mutable.PriorityQueue
+import scala.collection.mutable.ArrayBuffer
 
 /** Represents semi-implicitly coboundary matrix column.
   *
@@ -21,6 +22,40 @@ private[sparkpersistenthomology] case class CoboundaryMatrixColumn(
 ) {
 
   @inline def pivot: Long = valueTopEntries(0).index
+
+  /** Adds two CoboundaryMatrixColumn using fast addition on `valueTopEntries`. Falls back to full
+    * resolution if the fast addition results in too few entries.
+    *
+    * NOTE: This operation is NOT commutative, as the `initialSimplex` of the result is always taken
+    * from the left-hand side operand.
+    *
+    * @example
+    *   {{{
+    *   val result = colA + colB
+    *   assert(result.initialSimplex == colA.initialSimplex)
+    *   }}}
+    */
+  def +(
+    other: CoboundaryMatrixColumn
+  )(implicit context: FiltrationContext): CoboundaryMatrixColumn = {
+    import CoboundaryMatrixColumn._
+
+    val mergedSimplicesAdded = addSimplexChains(
+      this.simplicesAdded,
+      addSimplexChains(other.simplicesAdded, Array(other.initialSimplex))
+    )
+
+    val fastSum = addSimplexChains(this.valueTopEntries, other.valueTopEntries)
+
+    if (fastSum.length >= MinTopEntries) {
+      CoboundaryMatrixColumn(this.initialSimplex, mergedSimplicesAdded, fastSum.take(MaxTopEntries))
+    } else {
+      val thisFull  = this.resolveFullColumnValue
+      val otherFull = other.resolveFullColumnValue
+      val fullSum   = addSimplexChains(thisFull, otherFull)
+      CoboundaryMatrixColumn(this.initialSimplex, mergedSimplicesAdded, fullSum.take(MaxTopEntries))
+    }
+  }
 
   /** Resolves the full value of this column (coboundary chain). */
   def resolveFullColumnValue(implicit context: FiltrationContext): Array[Simplex] = {
@@ -59,6 +94,9 @@ private[sparkpersistenthomology] case class CoboundaryMatrixColumn(
 
 private[sparkpersistenthomology] object CoboundaryMatrixColumn {
 
+  final val MinTopEntries: Int = 5
+  final val MaxTopEntries: Int = 100
+
   implicit val simplexOrdering: Ordering[Simplex] = Ordering.by(s => (s.radius, -s.index))
 
   /** Resolves the full initial coboundary in the coboundary matrix for a given simplex.
@@ -75,6 +113,39 @@ private[sparkpersistenthomology] object CoboundaryMatrixColumn {
     val pq = PriorityQueue.empty[Simplex]
     pq ++= simplex.getCofacets
     pq
+  }
+
+  /** Merges two arrays of Simplices, sorted by `simplexOrdering` descending, modulo 2. */
+  private[sparkpersistenthomology] def addSimplexChains(
+    a: Array[Simplex],
+    b: Array[Simplex]
+  ): Array[Simplex] = {
+    val result = ArrayBuffer[Simplex]()
+    var i      = 0
+    var j      = 0
+    while (i < a.length && j < b.length) {
+      val cmp = simplexOrdering.compare(a(i), b(j))
+      if (cmp > 0) {
+        result += a(i)
+        i += 1
+      } else if (cmp < 0) {
+        result += b(j)
+        j += 1
+      } else {
+        // modulo 2, they cancel out
+        i += 1
+        j += 1
+      }
+    }
+    while (i < a.length) {
+      result += a(i)
+      i += 1
+    }
+    while (j < b.length) {
+      result += b(j)
+      j += 1
+    }
+    result.toArray
   }
 
 }
