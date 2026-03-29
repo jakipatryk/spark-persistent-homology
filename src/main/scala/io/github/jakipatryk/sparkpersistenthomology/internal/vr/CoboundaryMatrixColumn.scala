@@ -116,7 +116,7 @@ private[sparkpersistenthomology] object CoboundaryMatrixColumn {
   }
 
   /** Merges two arrays of Simplices, sorted by `simplexOrdering` descending, modulo 2. */
-  private[sparkpersistenthomology] def addSimplexChains(
+  private def addSimplexChains(
     a: Array[Simplex],
     b: Array[Simplex]
   ): Array[Simplex] = {
