@@ -99,6 +99,20 @@ private[sparkpersistenthomology] object CoboundaryMatrixColumn {
 
   implicit val simplexOrdering: Ordering[Simplex] = Ordering.by(s => (s.radius, -s.index))
 
+  /** Creates a new CoboundaryMatrixColumn from an initial simplex.
+    *
+    * @param initialSimplex
+    *   The simplex to use as the initial simplex of the column.
+    */
+  def apply(
+    initialSimplex: Simplex
+  )(implicit context: FiltrationContext): CoboundaryMatrixColumn = {
+    val initialCoboundary = resolveInitialCoboundary(initialSimplex)
+    val n                 = math.min(initialCoboundary.size, MaxTopEntries)
+    val topEntries        = Iterator.continually(initialCoboundary.dequeue()).take(n).toArray
+    CoboundaryMatrixColumn(initialSimplex, Array.empty[Simplex], topEntries)
+  }
+
   /** Resolves the full initial coboundary in the coboundary matrix for a given simplex.
     *
     * @param simplex

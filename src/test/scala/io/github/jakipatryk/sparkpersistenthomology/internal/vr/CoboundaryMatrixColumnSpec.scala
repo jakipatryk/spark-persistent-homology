@@ -7,6 +7,39 @@ import io.github.jakipatryk.sparkpersistenthomology.internal.utils.Combinatorial
 
 class CoboundaryMatrixColumnSpec extends AnyFlatSpec with SharedSparkContext {
 
+  behavior of "apply"
+
+  it should "create a column with correct initialSimplex and valueTopEntries" in {
+    val distanceCalculator = DistanceCalculator.EuclideanDistanceCalculator
+    val pointsCloud5 = Array(
+      Array(0.0f, 0.0f),
+      Array(1.0f, 0.0f),
+      Array(0.0f, 1.0f),
+      Array(1.0f, 1.0f),
+      Array(10.0f, 10.0f)
+    )
+    val cns              = CombinatorialNumberSystem(5, 3)
+    val simplexDim: Byte = 1
+
+    implicit val context: FiltrationContext =
+      FiltrationContext(
+        sparkContext.broadcast(cns),
+        sparkContext.broadcast(pointsCloud5),
+        distanceCalculator,
+        Float.PositiveInfinity
+      )
+
+    val initialSimplex = Simplex(index = 0L, dim = simplexDim, radius = 1.0f)
+    val column         = CoboundaryMatrixColumn(initialSimplex)
+
+    assert(column.initialSimplex === initialSimplex)
+    assert(column.simplicesAdded.isEmpty)
+
+    val expectedTopEntries =
+      CoboundaryMatrixColumn.resolveInitialCoboundary(initialSimplex).dequeueAll.toArray
+    assert(column.valueTopEntries === expectedTopEntries)
+  }
+
   behavior of "resolveInitialCoboundary"
 
   it should "return max-heap of cofacets ordered first by radius (descending priority), then reversed index (ascending priority)" in {
