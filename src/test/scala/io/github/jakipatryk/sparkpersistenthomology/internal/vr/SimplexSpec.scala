@@ -126,4 +126,34 @@ class SimplexSpec extends AnyFlatSpec with SharedSparkContext {
       cofacets.map(_.index).toSet === expectedIndices
     )
   }
+
+  behavior of "apply"
+
+  it should "correctly compute radius when created with apply(index, dim)" in {
+    val pointsCloud = Array(
+      Array(0.0f, 0.0f),
+      Array(3.0f, 0.0f),
+      Array(0.0f, 4.0f)
+    )
+    val distanceCalculator = DistanceCalculator.EuclideanDistanceCalculator
+    val cns                = CombinatorialNumberSystem(3, 3)
+
+    implicit val context =
+      FiltrationContext(
+        sparkContext.broadcast(cns),
+        sparkContext.broadcast(pointsCloud),
+        distanceCalculator,
+        Float.PositiveInfinity
+      )
+
+    // Let's take simplex with vertices [2, 1, 0] (index 0)
+    // Vertices are: (0,0), (3,0), (0,4)
+    // Distances are: 3.0, 4.0, 5.0. Max distance is 5.0f
+    val simplex = Simplex(index = 0L, dim = 2.toByte)
+
+    assert(simplex.index === 0L)
+    assert(simplex.dim === 2.toByte)
+    assert(simplex.radius === 5.0f)
+  }
+
 }
