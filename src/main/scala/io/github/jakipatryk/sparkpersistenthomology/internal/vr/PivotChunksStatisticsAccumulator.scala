@@ -24,18 +24,14 @@ import org.apache.spark.util.AccumulatorV2
   *     // Create thread-local state to avoid continuous accumulator synchronization
   *     val localStats = new LocalPivotChunksStatistics(chunkSize = 10, numberOfSimplices = 100)
   *
-  *     val mapped = iter.map { simplex =>
+  *     // Register the accumulator update to run when the task completes
+  *     org.apache.spark.TaskContext.get().addTaskCompletionListener[Unit](_ => statsAcc.add(localStats))
+  *
+  *     iter.map { simplex =>
   *       val pivot = calculatePivot(simplex)
   *       localStats.addPivot(pivot)
   *       simplex
   *     }
-  *
-  *     // Force evaluation if needed, or if returning iterator, ensure localStats gets added
-  *     // when partition is fully consumed. In many Spark Dataset actions, adding stats directly
-  *     // per element or at end of partition works depending on execution guarantees.
-  *     statsAcc.add(localStats)
-  *
-  *     mapped
   *   }
   *
   *   mappedDataset.count() // Action triggers execution

@@ -49,6 +49,22 @@ private[sparkpersistenthomology] case class Simplex(index: Long, dim: Byte, radi
     }
   }
 
+}
+
+private[sparkpersistenthomology] object Simplex {
+
+  def apply(index: Long, dim: Byte)(implicit context: FiltrationContext): Simplex = {
+    val combinationSize = dimToCombinationSize(dim)
+    val combination =
+      context.cns.value.getCombinationFromIndex(index, combinationSize)
+    val radius = computeCombinationRadius(combination)
+    Simplex(index, dim, radius)
+  }
+
+  @inline def dimToCombinationSize(dim: Byte): Int = dim + 1
+
+  @inline def combinationSizeToDim(combinationSize: Int): Byte = (combinationSize - 1).toByte
+
   private def computeCombinationRadius(
     combination: Array[Int]
   )(implicit context: FiltrationContext): Float = {
@@ -89,13 +105,5 @@ private[sparkpersistenthomology] case class Simplex(index: Long, dim: Byte, radi
     }
     maxDistanceToPoint
   }
-
-}
-
-private[sparkpersistenthomology] object Simplex {
-
-  @inline def dimToCombinationSize(dim: Byte): Int = dim + 1
-
-  @inline def combinationSizeToDim(combinationSize: Int): Byte = (combinationSize - 1).toByte
 
 }
