@@ -21,7 +21,7 @@ private[sparkpersistenthomology] case class CoboundaryMatrixColumn(
   valueTopEntries: Array[Simplex]
 ) {
 
-  @inline def pivot: Long = valueTopEntries(0).index
+  @inline def pivot: Option[Long] = valueTopEntries.headOption.map(_.index)
 
   /** Adds two CoboundaryMatrixColumn using fast addition on `valueTopEntries`. Falls back to full
     * resolution if the fast addition results in too few entries.
