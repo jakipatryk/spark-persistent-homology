@@ -62,8 +62,12 @@ private[sparkpersistenthomology] class PivotChunksStatisticsAccumulator(
     )
   }
 
+  def createLocalStats(): LocalPivotChunksStatistics = {
+    new LocalPivotChunksStatistics(state.chunkSize, state.numberOfSimplices)
+  }
+
   override def reset(): Unit = {
-    state = new LocalPivotChunksStatistics(state.chunkSize, state.numberOfSimplices)
+    state = createLocalStats()
   }
 
   override def add(v: LocalPivotChunksStatistics): Unit = {
