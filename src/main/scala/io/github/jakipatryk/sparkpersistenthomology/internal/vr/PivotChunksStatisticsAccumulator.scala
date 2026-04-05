@@ -48,6 +48,7 @@ private[sparkpersistenthomology] class PivotChunksStatisticsAccumulator(
 ) extends AccumulatorV2[LocalPivotChunksStatistics, PivotChunksStatistics] {
 
   override def isZero: Boolean = {
+    if (state.hasPivotChanged) return false
     var i = 0
     while (i < state.counts.length) {
       if (state.counts(i) != 0L) return false
@@ -57,9 +58,10 @@ private[sparkpersistenthomology] class PivotChunksStatisticsAccumulator(
   }
 
   override def copy(): AccumulatorV2[LocalPivotChunksStatistics, PivotChunksStatistics] = {
-    new PivotChunksStatisticsAccumulator(
+    val copiedState =
       new LocalPivotChunksStatistics(state.chunkSize, state.numberOfSimplices, state.counts.clone())
-    )
+    copiedState.hasPivotChanged = state.hasPivotChanged
+    new PivotChunksStatisticsAccumulator(copiedState)
   }
 
   def createLocalStats(): LocalPivotChunksStatistics = {
@@ -71,6 +73,7 @@ private[sparkpersistenthomology] class PivotChunksStatisticsAccumulator(
   }
 
   override def add(v: LocalPivotChunksStatistics): Unit = {
+    state.hasPivotChanged ||= v.hasPivotChanged
     var i = 0
     while (i < state.counts.length && i < v.counts.length) {
       state.counts(i) += v.counts(i)
@@ -83,6 +86,7 @@ private[sparkpersistenthomology] class PivotChunksStatisticsAccumulator(
   ): Unit = {
     other match {
       case o: PivotChunksStatisticsAccumulator =>
+        state.hasPivotChanged ||= o.state.hasPivotChanged
         var i = 0
         while (i < state.counts.length && i < o.state.counts.length) {
           state.counts(i) += o.state.counts(i)
@@ -101,7 +105,7 @@ private[sparkpersistenthomology] class PivotChunksStatisticsAccumulator(
       val pivotsEnd   = math.min((i + 1) * state.chunkSize - 1, state.numberOfSimplices - 1)
       ChunkStatistics(pivotsStart, pivotsEnd, state.counts(i))
     }
-    PivotChunksStatistics(chunks)
+    PivotChunksStatistics(chunks, state.hasPivotChanged)
   }
 }
 
@@ -124,6 +128,8 @@ private[sparkpersistenthomology] object PivotChunksStatisticsAccumulator {
     val numberOfSimplices: Long,
     val counts: Array[Long]
   ) extends Serializable {
+
+    var hasPivotChanged: Boolean = false
 
     def this(chunkSize: Long, numberOfSimplices: Long) = {
       this(
@@ -152,5 +158,8 @@ private[sparkpersistenthomology] object PivotChunksStatisticsAccumulator {
 
   /** Final resulting state emitted by `.value` on the [[PivotChunksStatisticsAccumulator]].
     */
-  private[sparkpersistenthomology] case class PivotChunksStatistics(chunks: Vector[ChunkStatistics])
+  private[sparkpersistenthomology] case class PivotChunksStatistics(
+    chunks: Vector[ChunkStatistics],
+    hasPivotChanged: Boolean
+  )
 }
