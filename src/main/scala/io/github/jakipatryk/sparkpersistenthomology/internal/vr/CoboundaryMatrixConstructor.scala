@@ -32,11 +32,7 @@ private[sparkpersistenthomology] object CoboundaryMatrixConstructor {
     }
 
     filteredRange.as[Long].mapPartitions { iter =>
-      val localStats =
-        new LocalPivotChunksStatistics(
-          pivotStatsAccumulator.state.chunkSize,
-          pivotStatsAccumulator.state.numberOfSimplices
-        )
+      val localStats = pivotStatsAccumulator.createLocalStats()
 
       TaskContext.get().addTaskCompletionListener[Unit](_ => pivotStatsAccumulator.add(localStats))
 
