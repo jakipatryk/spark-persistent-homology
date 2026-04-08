@@ -26,10 +26,11 @@ crossScalaVersions := Seq("2.12.21", "2.13.18")
 
 val sparkVersion = System.getProperty("spark.version", "3.5.8")
 
-libraryDependencies += "org.apache.spark" %% "spark-core"  % sparkVersion % "provided"
-libraryDependencies += "org.apache.spark" %% "spark-sql"   % sparkVersion % "provided"
-libraryDependencies += "org.apache.spark" %% "spark-mllib" % sparkVersion % "provided"
-libraryDependencies += "org.scalatest"    %% "scalatest"   % "3.2.2"      % Test
+libraryDependencies += "org.apache.spark"  %% "spark-core"      % sparkVersion % "provided"
+libraryDependencies += "org.apache.spark"  %% "spark-sql"       % sparkVersion % "provided"
+libraryDependencies += "org.apache.spark"  %% "spark-mllib"     % sparkVersion % "provided"
+libraryDependencies += "org.scalatest"     %% "scalatest"       % "3.2.20"     % Test
+libraryDependencies += "org.scalatestplus" %% "scalacheck-1-19" % "3.2.20.0"   % Test
 
 parallelExecution in Test := false
 
