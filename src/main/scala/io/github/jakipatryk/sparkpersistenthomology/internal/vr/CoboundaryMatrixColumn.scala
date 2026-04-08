@@ -94,10 +94,32 @@ private[sparkpersistenthomology] case class CoboundaryMatrixColumn(
 
 private[sparkpersistenthomology] object CoboundaryMatrixColumn {
 
+  import org.apache.spark.sql.Column
+  import org.apache.spark.sql.functions.{ coalesce, col, expr, lit }
+
   final val MinTopEntries: Int = 5
   final val MaxTopEntries: Int = 100
 
   implicit val simplexOrdering: Ordering[Simplex] = Ordering.by(s => (s.radius, -s.index))
+
+  /** Spark SQL column expressions that sort columns by -simplexOrdering of their initialSimplex. */
+  val matrixColumnsOrderingExpressions: Seq[Column] = Seq(
+    col("initialSimplex.radius").desc,
+    col("initialSimplex.index").asc
+  )
+
+  /** Returns a Catalyst expression to extract the pivot index directly from Tungsten binary format.
+    *
+    * This avoids the serialization/deserialization overhead of extracting the pivot via `map` on
+    * the Dataset. The pivot is the `index` of the first element in the `valueTopEntries` array. If
+    * the array is empty, it returns -1L.
+    */
+  def pivotExpression: Column = {
+    coalesce(
+      expr("element_at(valueTopEntries, 1).index"), // 1-based indexing in Spark SQL
+      lit(-1L)
+    )
+  }
 
   /** Creates a new CoboundaryMatrixColumn from an initial simplex.
     *
