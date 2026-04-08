@@ -116,7 +116,7 @@ private[sparkpersistenthomology] object CoboundaryMatrixColumn {
     */
   def pivotExpression: Column = {
     coalesce(
-      expr("element_at(valueTopEntries, 1).index"), // 1-based indexing in Spark SQL
+      expr("try_element_at(valueTopEntries, 1).index"), // 1-based indexing in Spark SQL
       lit(-1L)
     )
   }

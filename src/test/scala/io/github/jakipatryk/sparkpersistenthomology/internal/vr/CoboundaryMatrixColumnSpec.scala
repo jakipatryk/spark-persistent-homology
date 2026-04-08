@@ -483,4 +483,38 @@ class CoboundaryMatrixColumnSpec extends AnyFlatSpec with SharedSparkContext {
 
     assert(result.valueTopEntries === expectedTopEntries)
   }
+
+  behavior of "pivotExpression"
+
+  it should "return -1L when valueTopEntries is empty" in {
+    import spark.implicits._
+
+    val df = Seq(
+      CoboundaryMatrixColumn(
+        initialSimplex = Simplex(0L, 0.toByte, 0.0f),
+        simplicesAdded = Array.empty,
+        valueTopEntries = Array.empty
+      )
+    ).toDS()
+
+    val result = df.select(CoboundaryMatrixColumn.pivotExpression).as[Long].collect()
+
+    assert(result === Array(-1L))
+  }
+
+  it should "return the index of the first element when valueTopEntries is not empty" in {
+    import spark.implicits._
+
+    val df = Seq(
+      CoboundaryMatrixColumn(
+        initialSimplex = Simplex(0L, 0.toByte, 0.0f),
+        simplicesAdded = Array.empty,
+        valueTopEntries = Array(Simplex(123L, 1.toByte, 1.0f), Simplex(456L, 1.toByte, 2.0f))
+      )
+    ).toDS()
+
+    val result = df.select(CoboundaryMatrixColumn.pivotExpression).as[Long].collect()
+
+    assert(result === Array(123L))
+  }
 }
