@@ -58,7 +58,7 @@ class CoboundaryMatrixReducerSpec
 
       val reducedMatrix = CoboundaryMatrixReducer.reduce(unreducedMatrix, accumulator)
       val results       = reducedMatrix.collect()
-      val pivots = results.flatMap(_.pivot)
+      val pivots        = results.flatMap(_.pivot)
 
       // Check that all non-empty pivots are unique
       assert(pivots.length == pivots.toSet.size)
