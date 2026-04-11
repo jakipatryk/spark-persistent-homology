@@ -61,9 +61,8 @@ private[sparkpersistenthomology] object VietorisRipsPersistentCohomology {
       val pairs = cachedReducedMatrix.flatMap { col =>
         val x = col.initialSimplex.radius
         col.pivot match {
-          case Some(p) =>
-            val pivotSimplex = Simplex(p, (d + 1).toByte)
-            val y            = pivotSimplex.radius
+          case Some(pivotSimplex) =>
+            val y = pivotSimplex.radius
             if (x != y) Some(PersistencePair(dim, x, y)) else None
           case None =>
             Some(PersistencePair(dim, x, PersistencePair.Infinity))

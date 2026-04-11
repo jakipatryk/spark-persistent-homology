@@ -26,7 +26,7 @@ private[sparkpersistenthomology] object CoboundaryMatrixConstructor {
 
     val filteredRange = previousDimResult match {
       case Some(prev) =>
-        range.except(prev.flatMap(_.pivot.toSeq))
+        range.except(prev.flatMap(_.pivot.map(_.index).toSeq))
       case None =>
         range
     }
@@ -43,7 +43,7 @@ private[sparkpersistenthomology] object CoboundaryMatrixConstructor {
 
         if (shouldKeepTheSimplex) {
           val column = CoboundaryMatrixColumn(simplex)
-          column.pivot.foreach(localStats.addPivot)
+          column.pivot.map(_.index).foreach(localStats.addPivot)
           Some(column)
         } else {
           None

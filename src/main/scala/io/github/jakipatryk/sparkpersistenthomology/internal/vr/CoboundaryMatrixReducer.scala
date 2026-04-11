@@ -21,31 +21,37 @@ object CoboundaryMatrixReducer {
   )(implicit context: FiltrationContext, spark: SparkSession): Dataset[CoboundaryMatrixColumn] = {
     import spark.implicits._
 
-    var currentMatrix   = coboundaryMatrix
-    var hasPivotChanged = true
-
-    while (hasPivotChanged) {
-      val partitionedAndSortedMatrix = repartitionAndSort(
-        currentMatrix,
-        pivotStatsAccumulator
-      )
-
-      pivotStatsAccumulator.reset()
-
-      val nextMatrix = partitionedAndSortedMatrix.mapPartitions { partition =>
-        val (reducedIterator, localStats) = reducePartition(partition, pivotStatsAccumulator)
-        TaskContext
-          .get()
-          .addTaskCompletionListener[Unit](_ => pivotStatsAccumulator.add(localStats))
-        reducedIterator
-      }
-
-      currentMatrix = nextMatrix.localCheckpoint()
-
-      hasPivotChanged = pivotStatsAccumulator.value.hasPivotChanged
-    }
-
-    currentMatrix
+    // var currentMatrix   = coboundaryMatrix
+    // var hasPivotChanged = true
+    //
+    // while (hasPivotChanged) {
+    //   val partitionedAndSortedMatrix = repartitionAndSort(
+    //     currentMatrix,
+    //     pivotStatsAccumulator
+    //   )
+    //
+    //   pivotStatsAccumulator.reset()
+    //
+    //   val nextMatrix = partitionedAndSortedMatrix.mapPartitions { partition =>
+    //     val (reducedIterator, localStats) = reducePartition(partition, pivotStatsAccumulator)
+    //     TaskContext
+    //       .get()
+    //       .addTaskCompletionListener[Unit](_ => pivotStatsAccumulator.add(localStats))
+    //     reducedIterator
+    //   }
+    //
+    //   currentMatrix = nextMatrix.localCheckpoint()
+    //
+    //   hasPivotChanged = pivotStatsAccumulator.value.hasPivotChanged
+    // }
+    //
+    // currentMatrix
+    //
+    coboundaryMatrix
+      .coalesce(1)
+      .sortWithinPartitions(CoboundaryMatrixColumn.matrixColumnsOrderingExpressions: _*)
+      .mapPartitions(p => reducePartition(p, pivotStatsAccumulator)._1)
+      .localCheckpoint()
   }
 
   private def repartitionAndSort(
@@ -82,20 +88,30 @@ object CoboundaryMatrixReducer {
 
     val reducedIterator = partition.map { col =>
       var currentCol = col
-      var pivotOpt   = currentCol.pivot
 
-      if (pivotOpt.isDefined) {
-        while (pivotOpt.isDefined && pivotMap.contains(pivotOpt.get)) {
-          stats.hasPivotChanged = true
-          val prevCol = pivotMap(pivotOpt.get)
-          currentCol = currentCol + prevCol
-          pivotOpt = currentCol.pivot
-        }
+      var pOpt   = currentCol.pivot
+      var isDone = false
+      while (pOpt.isDefined && !isDone) {
+        val p      = pOpt.get
+        val pIndex = p.index
 
-        if (pivotOpt.isDefined) {
-          val p = pivotOpt.get
-          pivotMap.put(p, currentCol)
-          stats.addPivot(p)
+        pivotMap.get(pIndex) match {
+          case Some(prevCol) =>
+            stats.hasPivotChanged = true
+            currentCol = currentCol + prevCol
+            pOpt = currentCol.valueTopEntries.headOption
+          case None =>
+            ApparentPairsDetector.getBirthIfIsDeathOfApparentPair(p) match {
+              case Some(birthSimplex) =>
+                stats.hasPivotChanged = true
+                currentCol = currentCol + CoboundaryMatrixColumn(birthSimplex)
+                pOpt = currentCol.pivot
+              case None =>
+                // New pivot found!
+                pivotMap.put(pIndex, currentCol)
+                stats.addPivot(pIndex)
+                isDone = true
+            }
         }
       }
 
