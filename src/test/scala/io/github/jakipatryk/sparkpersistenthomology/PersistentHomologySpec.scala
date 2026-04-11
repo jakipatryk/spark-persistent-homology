@@ -73,6 +73,37 @@ class PersistentHomologySpec extends AnyFlatSpec with SharedSparkContext {
     val actualDim1 = results(1).collect().toSet
     val actualDim2 = results(2).collect().toSet
 
+    def printMissing(
+      expected: Set[PersistencePair],
+      actual: Set[PersistencePair],
+      name: String
+    ): Unit = {
+      val missing = expected.filter(exp =>
+        !actual.exists { act =>
+          act.dim == exp.dim &&
+          (if (exp.death.isInfinity) act.death.isInfinity
+           else Math.abs(act.death - exp.death) < 1e-5f) &&
+          Math.abs(act.birth - exp.birth) < 1e-5f
+        }
+      )
+      if (missing.nonEmpty) {
+        println(s"Missing in $name: ${missing.take(5).mkString(", ")} (total ${missing.size})")
+        val extra = actual.filter(act =>
+          !expected.exists { exp =>
+            act.dim == exp.dim &&
+            (if (exp.death.isInfinity) act.death.isInfinity
+             else Math.abs(act.death - exp.death) < 1e-5f) &&
+            Math.abs(act.birth - exp.birth) < 1e-5f
+          }
+        )
+        println(s"Extra in $name: ${extra.take(5).mkString(", ")} (total ${extra.size})")
+      }
+    }
+
+    printMissing(expectedDim0, actualDim0, "Dim 0")
+    printMissing(expectedDim1, actualDim1, "Dim 1")
+    printMissing(expectedDim2, actualDim2, "Dim 2")
+
     assert(
       areSetsAlmostEqual(expectedDim0, actualDim0),
       s"Dim 0 pairs do not match. Expected size: ${expectedDim0.size}, Actual size: ${actualDim0.size}"
