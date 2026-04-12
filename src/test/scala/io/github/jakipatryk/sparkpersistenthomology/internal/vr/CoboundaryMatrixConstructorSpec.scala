@@ -135,12 +135,10 @@ class CoboundaryMatrixConstructorSpec extends AnyFlatSpec with SharedSparkContex
 
     assert(totalCount == numColumns)
     assert(numColumns == 3)
-    // Based on calculations: pivots are 1, 2, 2. chunkSize is 1.
-    // stats.chunks(i) corresponds to pivot i in that case
-    assert(stats.chunks(0).count == 0)
-    assert(stats.chunks(1).count == 1)
-    assert(stats.chunks(2).count == 2)
-    assert(stats.chunks(3).count == 0)
+    assert(stats.chunks(0).count == 2)
+    assert(stats.chunks(1).count == 0)
+    assert(stats.chunks(2).count == 0)
+    assert(stats.chunks(3).count == 1)
 
   }
 

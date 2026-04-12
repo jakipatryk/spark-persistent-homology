@@ -49,7 +49,7 @@ object CoboundaryMatrixReducer {
     //
     coboundaryMatrix
       .coalesce(1)
-      .sortWithinPartitions(CoboundaryMatrixColumn.matrixColumnsOrderingExpressions: _*)
+      .sortWithinPartitions(CoboundaryMatrixColumn.reverseSimplexFiltrationOrderingExpressions: _*)
       .mapPartitions(p => reducePartition(p, pivotStatsAccumulator)._1)
       .localCheckpoint()
   }
@@ -72,7 +72,7 @@ object CoboundaryMatrixReducer {
     coboundaryMatrix
       .withColumn("_partition_id", partitionIdExpr)
       .repartition(numPartitions, col("_partition_id"))
-      .sortWithinPartitions(CoboundaryMatrixColumn.matrixColumnsOrderingExpressions: _*)
+      .sortWithinPartitions(CoboundaryMatrixColumn.reverseSimplexFiltrationOrderingExpressions: _*)
       .drop("_partition_id")
       .as[CoboundaryMatrixColumn]
   }

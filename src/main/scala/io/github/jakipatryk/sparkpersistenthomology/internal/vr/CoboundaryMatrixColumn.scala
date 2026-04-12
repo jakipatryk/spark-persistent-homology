@@ -59,7 +59,7 @@ private[sparkpersistenthomology] case class CoboundaryMatrixColumn(
 
   /** Resolves the full value of this column (coboundary chain). */
   def resolveFullColumnValue(implicit context: FiltrationContext): Array[Simplex] = {
-    import CoboundaryMatrixColumn.simplexOrdering
+    import CoboundaryMatrixColumn.reverseSimplexFiltrationOrdering
 
     val pqs =
       (initialSimplex +: simplicesAdded).map(CoboundaryMatrixColumn.resolveInitialCoboundary)
@@ -100,10 +100,10 @@ private[sparkpersistenthomology] object CoboundaryMatrixColumn {
   final val MinTopEntries: Int = 5
   final val MaxTopEntries: Int = 100
 
-  implicit val simplexOrdering: Ordering[Simplex] = Ordering.by(s => (s.radius, -s.index))
+  implicit val reverseSimplexFiltrationOrdering: Ordering[Simplex] =
+    Ordering.by(s => (-s.radius, s.index))
 
-  /** Spark SQL column expressions that sort columns by -simplexOrdering of their initialSimplex. */
-  val matrixColumnsOrderingExpressions: Seq[Column] = Seq(
+  val reverseSimplexFiltrationOrderingExpressions: Seq[Column] = Seq(
     col("initialSimplex.radius").desc,
     col("initialSimplex.index").asc
   )
@@ -160,7 +160,7 @@ private[sparkpersistenthomology] object CoboundaryMatrixColumn {
     var i      = 0
     var j      = 0
     while (i < a.length && j < b.length) {
-      val cmp = simplexOrdering.compare(a(i), b(j))
+      val cmp = reverseSimplexFiltrationOrdering.compare(a(i), b(j))
       if (cmp > 0) {
         result += a(i)
         i += 1

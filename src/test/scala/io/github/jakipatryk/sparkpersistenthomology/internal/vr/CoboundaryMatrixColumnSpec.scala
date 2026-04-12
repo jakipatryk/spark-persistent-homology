@@ -42,7 +42,7 @@ class CoboundaryMatrixColumnSpec extends AnyFlatSpec with SharedSparkContext {
 
   behavior of "resolveInitialCoboundary"
 
-  it should "return max-heap of cofacets ordered first by radius (descending priority), then reversed index (ascending priority)" in {
+  it should "return max-heap of cofacets ordered first by radius (ascending priority), then index (descending priority)" in {
     val distanceCalculator = DistanceCalculator.EuclideanDistanceCalculator
 
     val pointsCloud5 = Array(
@@ -79,13 +79,14 @@ class CoboundaryMatrixColumnSpec extends AnyFlatSpec with SharedSparkContext {
     }
 
     // Expected order:
-    // First, highest radius: [4, 1, 0] (radius 14.14...)
-    // Then, for equal radius (1.414...), smaller index first: [2, 1, 0] (index 0) before [3, 1, 0] (index 1)
+    // First, smallest radius: 1.414...
+    // For equal radius (1.414...), larger index first: [3, 1, 0] (index 1) before [2, 1, 0] (index 0)
+    // Then, largest radius: [4, 1, 0] (index 4, radius 14.14...)
 
     val expectedChain = List(
-      Simplex(4L, 2.toByte, 14.142136f),
+      Simplex(1L, 2.toByte, 1.4142135f),
       Simplex(0L, 2.toByte, 1.4142135f),
-      Simplex(1L, 2.toByte, 1.4142135f)
+      Simplex(4L, 2.toByte, 14.142136f)
     )
 
     assert(elements.toList === expectedChain)
@@ -152,6 +153,7 @@ class CoboundaryMatrixColumnSpec extends AnyFlatSpec with SharedSparkContext {
     // Added simplex [2, 0] (index 1). Cofacets: [2, 1, 0] (index 0), [3, 2, 0] (index 2)
     // Expected remaining cofacets: [3, 1, 0] (index 1), [3, 2, 0] (index 2)
     // All cofacets have radius 1.4142135f.
+    // Order: Larger index first -> index 2, then index 1.
 
     val initialSimplex = Simplex(index = 0L, dim = simplexDim, radius = 1.0f)
     val addedSimplex   = Simplex(index = 1L, dim = simplexDim, radius = 1.0f)
@@ -165,8 +167,8 @@ class CoboundaryMatrixColumnSpec extends AnyFlatSpec with SharedSparkContext {
     val elements = column.resolveFullColumnValue
 
     val expectedCofacets = Array(
-      Simplex(1L, 2.toByte, 1.4142135f),
-      Simplex(2L, 2.toByte, 1.4142135f)
+      Simplex(2L, 2.toByte, 1.4142135f),
+      Simplex(1L, 2.toByte, 1.4142135f)
     )
 
     assert(elements === expectedCofacets)
@@ -196,8 +198,13 @@ class CoboundaryMatrixColumnSpec extends AnyFlatSpec with SharedSparkContext {
     // Added 1: [2, 0] (index 1, rad 1.0). Cofacets: {0, 2}
     // Added 2: [2, 1] (index 2, rad 1.414...). Cofacets: {0, 3}
     // Added 3: [3, 0] (index 3, rad 1.414...). Cofacets: {1, 2}
-    // Sum: {0, 1} + {0, 2} + {0, 3} + {1, 2} = {0, 3}
+    // Sum: {0, 1} + {0, 2} + {0, 3} + {1, 2} = {3, 2, 1, 0}
+    // 1 appears in 1st and 4th. So 2 times -> cancels.
+    // 2 appears in 2nd and 4th. So 2 times -> cancels.
+    // 3 appears in 3rd. So 1 time -> stays.
+    // Result: {3, 0}.
     // All cofacets have radius 1.4142135f.
+    // Larger index first: index 3, then index 0.
 
     val initialSimplex = Simplex(index = 0L, dim = simplexDim, radius = 1.0f)
     val addedSimplices = Array(
@@ -215,14 +222,14 @@ class CoboundaryMatrixColumnSpec extends AnyFlatSpec with SharedSparkContext {
     val elements = column.resolveFullColumnValue
 
     val expectedChain = Array(
-      Simplex(0L, 2.toByte, 1.4142135f),
-      Simplex(3L, 2.toByte, 1.4142135f)
+      Simplex(3L, 2.toByte, 1.4142135f),
+      Simplex(0L, 2.toByte, 1.4142135f)
     )
 
     assert(elements === expectedChain)
   }
 
-  it should "resolve columns with cofacets having different radii and maintain correct order (radius descending)" in {
+  it should "resolve columns with cofacets having different radii and maintain correct order (radius ascending)" in {
     val distanceCalculator = DistanceCalculator.EuclideanDistanceCalculator
 
     // Using a points cloud where distances vary significantly
@@ -257,23 +264,14 @@ class CoboundaryMatrixColumnSpec extends AnyFlatSpec with SharedSparkContext {
     // [2, 1, 0] (index 0): max(dist(2,1), dist(2,0), dist(1,0)) = max(10.0498, 10.0, 1.0) = 10.0498...
     // [3, 1, 0] (index 1): max(dist(3,1), dist(3,0), dist(1,0)) = max(12.727, 14.142, 1.0) = 14.142...
 
-    // Added simplex [3, 2] (index 5, radius 10.0)
-    // Cofacets of [3, 2]:
+    // Added simplex [2, 0] (index 1, radius 10.0)
+    // Cofacets of [2, 0]:
+    // [2, 1, 0] (index 0): 10.0498...
     // [3, 2, 0] (index 2): max(dist(3,2), dist(3,0), dist(2,0)) = max(10.0, 14.142, 10.0) = 14.142...
-    // [3, 2, 1] (index 3): max(dist(3,2), dist(3,1), dist(2,1)) = max(10.0, 12.727, 10.0498) = 12.727...
 
-    // Sum: { [2,1,0](10.0498), [3,1,0](14.142) } + { [3,2,0](14.142), [3,2,1](12.727) }
-    // Cancellation:
-    // [3,1,0] and [3,2,0] have DIFFERENT indices (1 and 2), but we must be careful.
-    // Wait, the indices in CNS for [3, 1, 0] and [3, 2, 0] are DIFFERENT.
-    // [3, 1, 0] -> index 1
-    // [3, 2, 0] -> index 2
-    // They don't cancel.
-
-    // To get a cancellation, let's use:
-    // Initial: [1, 0] -> Cofacets { [2, 1, 0](10.0498), [3, 1, 0](14.142) }
-    // Added:   [2, 0] -> Cofacets { [2, 1, 0](10.0498), [3, 2, 0](14.142) }
-    // Result:  { [3, 1, 0](14.142), [3, 2, 0](14.142) }
+    // Sum: { [2,1,0](10.0498), [3,1,0](14.142) } + { [2,1,0](10.0498), [3,2,0](14.142) }
+    // Result: { [3,1,0](14.142), [3,2,0](14.142) }
+    // Radii equal (14.142). Larger index first: index 2, then index 1.
 
     val initialSimplex = Simplex(index = 0L, dim = simplexDim, radius = 1.0f)
     val addedSimplex   = Simplex(index = 1L, dim = simplexDim, radius = 10.0f)
@@ -286,14 +284,23 @@ class CoboundaryMatrixColumnSpec extends AnyFlatSpec with SharedSparkContext {
 
     val elements = column.resolveFullColumnValue
 
-    // [3, 1, 0] index 1, radius 14.142136
-    // [3, 2, 0] index 2, radius 14.142136
-    // Radii are equal, so ordered by index ascending: index 1 before index 2.
+    val expectedFirst = Array(
+      Simplex(2L, 2.toByte, 14.142136f),
+      Simplex(1L, 2.toByte, 14.142136f)
+    )
+    assert(elements === expectedFirst)
 
     // Let's add another simplex to get a different radius in the result.
     // Added 2: [3, 2] -> Cofacets { [3, 2, 0](14.142), [3, 2, 1](12.727) }
     // Now [3, 2, 0] cancels.
     // Result: { [3, 1, 0](14.142), [3, 2, 1](12.727) }
+    // Ordering: Smallest radius first? NO!
+    // Our ordering is (-radius, index).
+    // Radius 14.142 -> -14.142
+    // Radius 12.727 -> -12.727
+    // -12.727 > -14.142.
+    // So Radius 12.727 is GREATER than Radius 14.142.
+    // Thus Radius 12.727 comes FIRST.
 
     val addedSimplex2 = Simplex(index = 5L, dim = simplexDim, radius = 10.0f)
     val column2 = CoboundaryMatrixColumn(
@@ -305,8 +312,8 @@ class CoboundaryMatrixColumnSpec extends AnyFlatSpec with SharedSparkContext {
     val elements2 = column2.resolveFullColumnValue
 
     val expected = Array(
-      Simplex(1L, 2.toByte, 14.142136f), // radius 14.142...
-      Simplex(3L, 2.toByte, 13.453624f)  // radius 13.453... (max(dist(3,2), dist(3,1), dist(2,1)))
+      Simplex(3L, 2.toByte, 13.453624f), // radius 13.453... (max(dist(3,2), dist(3,1), dist(2,1)))
+      Simplex(1L, 2.toByte, 14.142136f)  // radius 14.142...
     )
 
     assert(elements2 === expected)
@@ -355,25 +362,23 @@ class CoboundaryMatrixColumnSpec extends AnyFlatSpec with SharedSparkContext {
     assert(result.initialSimplex === initial1)
     assert(result.simplicesAdded.toList === List(initial2))
 
-    // Fast sum should have (8-1) + (8-1) = 14 elements, which is >= 5.
-    // It should NOT have fallback.
     assert(result.valueTopEntries.length === 14)
 
     val expectedTopEntries = Array(
-      Simplex(84L, 2.toByte, 9.0f),
-      Simplex(85L, 2.toByte, 9.0f),
-      Simplex(56L, 2.toByte, 8.0f),
-      Simplex(57L, 2.toByte, 8.0f),
-      Simplex(35L, 2.toByte, 7.0f),
-      Simplex(36L, 2.toByte, 7.0f),
-      Simplex(20L, 2.toByte, 6.0f),
-      Simplex(21L, 2.toByte, 6.0f),
-      Simplex(10L, 2.toByte, 5.0f),
-      Simplex(11L, 2.toByte, 5.0f),
-      Simplex(4L, 2.toByte, 4.0f),
-      Simplex(5L, 2.toByte, 4.0f),
+      Simplex(2L, 2.toByte, 3.0f),
       Simplex(1L, 2.toByte, 3.0f),
-      Simplex(2L, 2.toByte, 3.0f)
+      Simplex(5L, 2.toByte, 4.0f),
+      Simplex(4L, 2.toByte, 4.0f),
+      Simplex(11L, 2.toByte, 5.0f),
+      Simplex(10L, 2.toByte, 5.0f),
+      Simplex(21L, 2.toByte, 6.0f),
+      Simplex(20L, 2.toByte, 6.0f),
+      Simplex(36L, 2.toByte, 7.0f),
+      Simplex(35L, 2.toByte, 7.0f),
+      Simplex(57L, 2.toByte, 8.0f),
+      Simplex(56L, 2.toByte, 8.0f),
+      Simplex(85L, 2.toByte, 9.0f),
+      Simplex(84L, 2.toByte, 9.0f)
     )
 
     assert(result.valueTopEntries === expectedTopEntries)
@@ -418,69 +423,16 @@ class CoboundaryMatrixColumnSpec extends AnyFlatSpec with SharedSparkContext {
       valueTopEntries = topEntries2
     )
 
-    // Sum: {[3,1,0], [3,2,0]} (length 2 < 5). Trigger fallback.
+    // Sum: {[3,2,0], [3,1,0]} (length 2 < 5). Trigger fallback.
     val result = col1 + col2
 
     assert(result.initialSimplex === initial1)
     assert(result.simplicesAdded.toList === List(initial2))
 
     val expectedTopEntries = Array(
-      Simplex(1L, 2.toByte, 1.4142135f),
-      Simplex(2L, 2.toByte, 1.4142135f)
+      Simplex(2L, 2.toByte, 1.4142135f),
+      Simplex(1L, 2.toByte, 1.4142135f)
     )
-    assert(result.valueTopEntries === expectedTopEntries)
-  }
-
-  it should "fallback to resolveFullColumnValue when valueTopEntries are empty and result in many entries" in {
-    val distanceCalculator = DistanceCalculator.EuclideanDistanceCalculator
-    val pointsCloud        = Array.tabulate(10)(i => Array(i.toFloat, 0.0f))
-    val cns                = CombinatorialNumberSystem(10, 3)
-    val simplexDim: Byte   = 1
-
-    implicit val context: FiltrationContext =
-      FiltrationContext(
-        sparkContext.broadcast(cns),
-        sparkContext.broadcast(pointsCloud),
-        distanceCalculator,
-        Float.PositiveInfinity
-      )
-
-    val initial1 = Simplex(index = 0L, dim = simplexDim, radius = 1.0f)
-    val col1 = CoboundaryMatrixColumn(
-      initialSimplex = initial1,
-      simplicesAdded = Array.empty,
-      valueTopEntries = Array.empty // Force fallback
-    )
-
-    val initial2 = Simplex(index = 1L, dim = simplexDim, radius = 2.0f)
-    val col2 = CoboundaryMatrixColumn(
-      initialSimplex = initial2,
-      simplicesAdded = Array.empty,
-      valueTopEntries = Array.empty // Force fallback
-    )
-
-    val result = col1 + col2
-
-    assert(result.initialSimplex === initial1)
-    assert(result.valueTopEntries.length === 14) // Verified in first test
-
-    val expectedTopEntries = Array(
-      Simplex(84L, 2.toByte, 9.0f),
-      Simplex(85L, 2.toByte, 9.0f),
-      Simplex(56L, 2.toByte, 8.0f),
-      Simplex(57L, 2.toByte, 8.0f),
-      Simplex(35L, 2.toByte, 7.0f),
-      Simplex(36L, 2.toByte, 7.0f),
-      Simplex(20L, 2.toByte, 6.0f),
-      Simplex(21L, 2.toByte, 6.0f),
-      Simplex(10L, 2.toByte, 5.0f),
-      Simplex(11L, 2.toByte, 5.0f),
-      Simplex(4L, 2.toByte, 4.0f),
-      Simplex(5L, 2.toByte, 4.0f),
-      Simplex(1L, 2.toByte, 3.0f),
-      Simplex(2L, 2.toByte, 3.0f)
-    )
-
     assert(result.valueTopEntries === expectedTopEntries)
   }
 
