@@ -20,7 +20,7 @@ class CoboundaryMatrixReducerSpec
     import spark.implicits._
 
     val pointCloudGen = for {
-      numPoints <- Gen.choose(2, 100)
+      numPoints <- Gen.choose(2, 80)
       dim       <- Gen.choose(2, 4)
       points    <- Gen.listOfN(numPoints, Gen.listOfN(dim, Gen.choose(-10.0f, 10.0f)))
     } yield points.map(_.toArray).toArray

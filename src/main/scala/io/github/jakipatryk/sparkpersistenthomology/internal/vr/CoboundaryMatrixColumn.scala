@@ -18,7 +18,8 @@ import scala.collection.mutable.ArrayBuffer
 private[sparkpersistenthomology] case class CoboundaryMatrixColumn(
   initialSimplex: Simplex,
   simplicesAdded: Array[Simplex],
-  valueTopEntries: Array[Simplex]
+  valueTopEntries: Array[Simplex],
+  isTruncated: Boolean
 ) {
 
   @inline def pivot: Option[Simplex] = valueTopEntries.headOption
@@ -47,13 +48,34 @@ private[sparkpersistenthomology] case class CoboundaryMatrixColumn(
 
     val fastSum = addSimplexChains(this.valueTopEntries, other.valueTopEntries)
 
-    if (fastSum.length >= MinTopEntries) {
-      CoboundaryMatrixColumn(this.initialSimplex, mergedSimplicesAdded, fastSum.take(MaxTopEntries))
+    var validFastSumLength = fastSum.length
+    validFastSumLength = calculateValidLengthAfterTruncation(fastSum, this, validFastSumLength)
+    validFastSumLength = calculateValidLengthAfterTruncation(fastSum, other, validFastSumLength)
+
+    if (!this.isTruncated && !other.isTruncated) {
+      CoboundaryMatrixColumn(
+        this.initialSimplex,
+        mergedSimplicesAdded,
+        fastSum.take(MaxTopEntries),
+        fastSum.length > MaxTopEntries
+      )
+    } else if (validFastSumLength >= MinTopEntries) {
+      CoboundaryMatrixColumn(
+        this.initialSimplex,
+        mergedSimplicesAdded,
+        fastSum.take(math.min(validFastSumLength, MaxTopEntries)),
+        isTruncated = true
+      )
     } else {
       val thisFull  = this.resolveFullColumnValue
       val otherFull = other.resolveFullColumnValue
       val fullSum   = addSimplexChains(thisFull, otherFull)
-      CoboundaryMatrixColumn(this.initialSimplex, mergedSimplicesAdded, fullSum.take(MaxTopEntries))
+      CoboundaryMatrixColumn(
+        this.initialSimplex,
+        mergedSimplicesAdded,
+        fullSum.take(MaxTopEntries),
+        fullSum.length > MaxTopEntries
+      )
     }
   }
 
@@ -103,7 +125,7 @@ private[sparkpersistenthomology] object CoboundaryMatrixColumn {
   implicit val reverseSimplexFiltrationOrdering: Ordering[Simplex] =
     Ordering.by(s => (-s.radius, s.index))
 
-  val reverseSimplexFiltrationOrderingExpressions: Seq[Column] = Seq(
+  val reverseColumnsFiltrationOrderingExpressions: Seq[Column] = Seq(
     col("initialSimplex.radius").desc,
     col("initialSimplex.index").asc
   )
@@ -130,9 +152,10 @@ private[sparkpersistenthomology] object CoboundaryMatrixColumn {
     initialSimplex: Simplex
   )(implicit context: FiltrationContext): CoboundaryMatrixColumn = {
     val initialCoboundary = resolveInitialCoboundary(initialSimplex)
+    val isTruncated       = initialCoboundary.size > MaxTopEntries
     val n                 = math.min(initialCoboundary.size, MaxTopEntries)
     val topEntries        = Iterator.continually(initialCoboundary.dequeue()).take(n).toArray
-    CoboundaryMatrixColumn(initialSimplex, Array.empty[Simplex], topEntries)
+    CoboundaryMatrixColumn(initialSimplex, Array.empty[Simplex], topEntries, isTruncated)
   }
 
   /** Resolves the full initial coboundary in the coboundary matrix for a given simplex.
@@ -149,6 +172,20 @@ private[sparkpersistenthomology] object CoboundaryMatrixColumn {
     val pq = PriorityQueue.empty[Simplex]
     pq ++= simplex.getCofacets
     pq
+  }
+
+  private def calculateValidLengthAfterTruncation(
+    fastSum: Array[Simplex],
+    col: CoboundaryMatrixColumn,
+    currentValidLength: Int
+  ): Int = {
+    if (!col.isTruncated) {
+      currentValidLength
+    } else {
+      val bound = col.valueTopEntries.last
+      val idx   = fastSum.indexWhere(s => reverseSimplexFiltrationOrdering.compare(s, bound) < 0)
+      if (idx != -1) math.min(currentValidLength, idx) else currentValidLength
+    }
   }
 
   /** Merges two arrays of Simplices, sorted by `simplexOrdering` descending, modulo 2. */

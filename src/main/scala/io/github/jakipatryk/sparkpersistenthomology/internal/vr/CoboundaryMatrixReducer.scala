@@ -21,37 +21,37 @@ object CoboundaryMatrixReducer {
   )(implicit context: FiltrationContext, spark: SparkSession): Dataset[CoboundaryMatrixColumn] = {
     import spark.implicits._
 
-    // var currentMatrix   = coboundaryMatrix
-    // var hasPivotChanged = true
-    //
-    // while (hasPivotChanged) {
-    //   val partitionedAndSortedMatrix = repartitionAndSort(
-    //     currentMatrix,
-    //     pivotStatsAccumulator
-    //   )
-    //
-    //   pivotStatsAccumulator.reset()
-    //
-    //   val nextMatrix = partitionedAndSortedMatrix.mapPartitions { partition =>
-    //     val (reducedIterator, localStats) = reducePartition(partition, pivotStatsAccumulator)
-    //     TaskContext
-    //       .get()
-    //       .addTaskCompletionListener[Unit](_ => pivotStatsAccumulator.add(localStats))
-    //     reducedIterator
-    //   }
-    //
-    //   currentMatrix = nextMatrix.localCheckpoint()
-    //
-    //   hasPivotChanged = pivotStatsAccumulator.value.hasPivotChanged
-    // }
-    //
-    // currentMatrix
-    //
-    coboundaryMatrix
-      .coalesce(1)
-      .sortWithinPartitions(CoboundaryMatrixColumn.reverseSimplexFiltrationOrderingExpressions: _*)
-      .mapPartitions(p => reducePartition(p, pivotStatsAccumulator)._1)
-      .localCheckpoint()
+    var currentMatrix   = coboundaryMatrix
+    var hasPivotChanged = true
+
+    while (hasPivotChanged) {
+      val partitionedAndSortedMatrix = repartitionAndSort(
+        currentMatrix,
+        pivotStatsAccumulator
+      )
+
+      pivotStatsAccumulator.reset()
+
+      val nextMatrix = partitionedAndSortedMatrix.mapPartitions { partition =>
+        val (reducedIterator, localStats) = reducePartition(partition, pivotStatsAccumulator)
+        TaskContext
+          .get()
+          .addTaskCompletionListener[Unit](_ => pivotStatsAccumulator.add(localStats))
+        reducedIterator
+      }
+
+      currentMatrix = nextMatrix.localCheckpoint()
+
+      hasPivotChanged = pivotStatsAccumulator.value.hasPivotChanged
+    }
+
+    currentMatrix
+
+    // coboundaryMatrix
+    //   .coalesce(1)
+    //   .sortWithinPartitions(CoboundaryMatrixColumn.reverseColumnsFiltrationOrderingExpressions: _*)
+    //   .mapPartitions(p => reducePartition(p, pivotStatsAccumulator)._1)
+    //   .localCheckpoint()
   }
 
   private def repartitionAndSort(
@@ -72,7 +72,7 @@ object CoboundaryMatrixReducer {
     coboundaryMatrix
       .withColumn("_partition_id", partitionIdExpr)
       .repartition(numPartitions, col("_partition_id"))
-      .sortWithinPartitions(CoboundaryMatrixColumn.reverseSimplexFiltrationOrderingExpressions: _*)
+      .sortWithinPartitions(CoboundaryMatrixColumn.reverseColumnsFiltrationOrderingExpressions: _*)
       .drop("_partition_id")
       .as[CoboundaryMatrixColumn]
   }
