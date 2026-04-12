@@ -42,8 +42,7 @@ private[sparkpersistenthomology] object VietorisRipsPersistentCohomology {
     val results = new Array[Dataset[PersistencePair]](maxDim + 1)
 
     for (dim <- 0 to maxDim) {
-      val d              = dim.toByte
-      val numberOfPivots = cns.allCombinationsCount(Simplex.dimToCombinationSize((d + 1).toByte))
+      val numberOfPivots = cns.allCombinationsCount(Simplex.dimToCombinationSize((dim + 1).toByte))
 
       val numPartitions = spark.conf.get("spark.sql.shuffle.partitions").toInt
       val chunkSize     = math.max(1L, numberOfPivots / (numPartitions * 10))
@@ -51,14 +50,15 @@ private[sparkpersistenthomology] object VietorisRipsPersistentCohomology {
       val localStats =
         new PivotChunksStatisticsAccumulator.LocalPivotChunksStatistics(chunkSize, numberOfPivots)
       val accumulator = new PivotChunksStatisticsAccumulator(localStats)
-      spark.sparkContext.register(accumulator, s"PivotStats_dim_$d")
+      spark.sparkContext.register(accumulator, s"PivotStats_dim_$dim")
 
-      val matrix        = CoboundaryMatrixConstructor.construct(d, accumulator, previousDimResult)
+      val matrix =
+        CoboundaryMatrixConstructor
+          .construct(dim.toByte, accumulator, previousDimResult)
+          .localCheckpoint()
       val reducedMatrix = CoboundaryMatrixReducer.reduce(matrix, accumulator)
 
-      val cachedReducedMatrix = reducedMatrix.localCheckpoint()
-
-      val pairs = cachedReducedMatrix.flatMap { col =>
+      val pairs = reducedMatrix.flatMap { col =>
         val x = col.initialSimplex.radius
         col.pivot match {
           case Some(pivotSimplex) =>
@@ -70,7 +70,7 @@ private[sparkpersistenthomology] object VietorisRipsPersistentCohomology {
       }
 
       results(dim) = pairs
-      previousDimResult = Some(cachedReducedMatrix)
+      previousDimResult = Some(reducedMatrix)
     }
     results
   }

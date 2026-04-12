@@ -1,16 +1,17 @@
-package io.github.jakipatryk.sparkpersistenthomology
+package io.github.jakipatryk.sparkpersistenthomology.internal.vr
 
 import io.github.jakipatryk.sparkpersistenthomology.distances.DistanceCalculator
 import org.apache.spark.sql.Dataset
 import org.scalatest.flatspec.AnyFlatSpec
+import io.github.jakipatryk.sparkpersistenthomology.{ PersistencePair, SharedSparkContext }
 
 import scala.io.Source
 
-class PersistentHomologySpec extends AnyFlatSpec with SharedSparkContext {
+class VietorisRipsPersistentCohomologySpec extends AnyFlatSpec with SharedSparkContext {
 
   import spark.implicits._
 
-  behavior of "computePersistentHomology"
+  behavior of "computePersistencePairs"
 
   def loadPointsCloud(path: String): Seq[Array[Float]] = {
     val source  = Source.fromURL(getClass.getResource(path))
@@ -57,7 +58,7 @@ class PersistentHomologySpec extends AnyFlatSpec with SharedSparkContext {
     }
   }
 
-  it should "compute persistence pairs correctly for three_spheres point cloud up to maxDim=2" in {
+  it should "compute persistence pairs correctly for three_spheres point cloud up to maxDim=2 (result from ripser)" in {
     val pointsCloud = spark.createDataset(loadPointsCloud("/three_spheres/points_cloud.csv"))
     val maxDim      = 2
 
@@ -65,7 +66,7 @@ class PersistentHomologySpec extends AnyFlatSpec with SharedSparkContext {
     val expectedDim1 = loadExpectedPairs("/three_spheres/persistence_pairs_dim_1.csv", 1)
     val expectedDim2 = loadExpectedPairs("/three_spheres/persistence_pairs_dim_2.csv", 2)
 
-    val results = PersistentHomology.computePersistentHomology(pointsCloud, maxDim)
+    val results = VietorisRipsPersistentCohomology.computePersistencePairs(pointsCloud, maxDim)
 
     assert(results.length == 3)
 
@@ -115,6 +116,40 @@ class PersistentHomologySpec extends AnyFlatSpec with SharedSparkContext {
     assert(
       areSetsAlmostEqual(expectedDim2, actualDim2),
       s"Dim 2 pairs do not match. Expected size: ${expectedDim2.size}, Actual size: ${actualDim2.size}"
+    )
+  }
+
+  it should "find exactly one persistence pair of any kind in dim 1 for 150 equilateral triangles placed evenly on a circle" in {
+    val numTriangles = 150
+    val circleRadius = 100.0
+    val triangleSide = 0.01f
+    val h            = (triangleSide * math.sqrt(3.0) / 2.0).toFloat
+
+    val points = (0 until numTriangles).flatMap { i =>
+      val theta = 2 * math.Pi * i / numTriangles
+      val cx    = (circleRadius * math.cos(theta)).toFloat
+      val cy    = (circleRadius * math.sin(theta)).toFloat
+
+      val p1 = Array(0.0f, 2.0f * h / 3.0f)
+      val p2 = Array(-triangleSide / 2.0f, -h / 3.0f)
+      val p3 = Array(triangleSide / 2.0f, -h / 3.0f)
+
+      Seq(
+        Array(cx + p1(0), cy + p1(1)),
+        Array(cx + p2(0), cy + p2(1)),
+        Array(cx + p3(0), cy + p3(1))
+      )
+    }
+
+    val pointsCloud = spark.createDataset(points)
+    val maxDim      = 1
+    val results     = VietorisRipsPersistentCohomology.computePersistencePairs(pointsCloud, maxDim)
+
+    val dim1Pairs = results(1).collect()
+
+    assert(
+      dim1Pairs.length == 1,
+      s"Expected exactly 1 persistence pair in dim 1, but got ${dim1Pairs.length}"
     )
   }
 

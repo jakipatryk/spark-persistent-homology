@@ -16,9 +16,9 @@ private[sparkpersistenthomology] case class Simplex(index: Long, dim: Byte, radi
     val simplexCombination =
       context.cns.value.getCombinationFromIndex(index, simplexCombinationSize)
 
-    context.cns.value.subcombinationsIterator(simplexCombination).map {
-      case (facetIndex, facetCombination, _) =>
-        val maxDistance = computeCombinationRadius(facetCombination)
+    context.cns.value.subcombinationsIndicesIterator(simplexCombination).map {
+      case (facetIndex, removedIndex, _) =>
+        val maxDistance = computeCombinationRadiusExcept(simplexCombination, removedIndex)
         Simplex(facetIndex, (dim - 1).toByte, maxDistance)
     }
   }
@@ -36,8 +36,8 @@ private[sparkpersistenthomology] case class Simplex(index: Long, dim: Byte, radi
     val simplexCombination =
       context.cns.value.getCombinationFromIndex(index, simplexCombinationSize)
 
-    context.cns.value.supcombinationsIterator(simplexCombination).flatMap {
-      case (cofacetIndex, _, addedElement) =>
+    context.cns.value.supcombinationsIndicesIterator(simplexCombination).flatMap {
+      case (cofacetIndex, addedElement) =>
         val maxDistanceToAddedPoint = computeMaxDistanceFromPoint(addedElement, simplexCombination)
         val cofacetRadius           = math.max(radius, maxDistanceToAddedPoint)
 
@@ -64,6 +64,33 @@ private[sparkpersistenthomology] object Simplex {
   @inline def dimToCombinationSize(dim: Byte): Int = dim + 1
 
   @inline def combinationSizeToDim(combinationSize: Int): Byte = (combinationSize - 1).toByte
+
+  private def computeCombinationRadiusExcept(
+    combination: Array[Int],
+    skipIndex: Int
+  )(implicit context: FiltrationContext): Float = {
+    var maxDistance = 0.0f
+    var u           = 0
+    while (u < combination.length) {
+      if (u != skipIndex) {
+        var v = u + 1
+        while (v < combination.length) {
+          if (v != skipIndex) {
+            val dist = context.distanceCalculator.calculateDistance(
+              context.pointsCloud.value(combination(u)),
+              context.pointsCloud.value(combination(v))
+            )
+            if (dist > maxDistance) {
+              maxDistance = dist
+            }
+          }
+          v += 1
+        }
+      }
+      u += 1
+    }
+    maxDistance
+  }
 
   private def computeCombinationRadius(
     combination: Array[Int]
