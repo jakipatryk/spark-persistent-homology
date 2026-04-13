@@ -11,6 +11,7 @@ trait SharedSparkContext extends BeforeAndAfterAll { self: Suite =>
       .builder()
       .appName(self.getClass.getSimpleName)
       .master("local[*]")
+      .config("spark.sql.shuffle.partitions", "4")
       .getOrCreate()
     s.sparkContext.setLogLevel("ERROR")
     s

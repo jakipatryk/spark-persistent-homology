@@ -139,26 +139,38 @@ private[sparkpersistenthomology] class CombinatorialNumberSystem(
     *
     * Tuple in the iterator represents the following:
     *   - `Index` - index of the subcombination in CNS
-    *   - `Combination` - the subcombination
+    *   - `Int` - the index of the element that was removed from the input combination
     *   - `Int` - the element that was removed
     */
-  def subcombinationsIterator(combination: Combination): Iterator[(Index, Combination, Int)] = {
+  def subcombinationsIndicesIterator(combination: Combination): Iterator[(Index, Int, Int)] = {
     val n = combination.length
 
-    new Iterator[(Index, Combination, Int)] {
+    new Iterator[(Index, Int, Int)] {
       private var i = 0
 
       override def hasNext: Boolean = i < n
 
-      override def next(): (Index, Combination, Int) = {
-        val sub = new Array[Int](n - 1)
-        System.arraycopy(combination, 0, sub, 0, i)
-        System.arraycopy(combination, i + 1, sub, i, n - 1 - i)
+      override def next(): (Index, Int, Int) = {
+        // Calculate index of sub-combination [a_n, ..., a_{i+1}, a_{i-1}, ..., a_1]
+        // Elements before i (original positions n...n-i+1) are now at positions n-1...n-i
+        // Elements after i (original positions n-i-1...1) are now at positions n-i-1...1
+        var index = 0L
+        var j     = 0
+        while (j < i) {
+          index += combinationsLookup(combination(j), n - 1 - j)
+          j += 1
+        }
+        j = i + 1
+        while (j < n) {
+          index += combinationsLookup(combination(j), n - j)
+          j += 1
+        }
 
-        val index          = getIndexFromCombination(sub)
+        val removedIndex   = i
         val removedElement = combination(i)
         i += 1
-        (index, sub, removedElement)
+
+        (index, removedIndex, removedElement)
       }
     }
   }
@@ -170,15 +182,18 @@ private[sparkpersistenthomology] class CombinatorialNumberSystem(
     *
     * Tuple in the iterator represents the following:
     *   - `Index` - index of the supcombination in CNS
-    *   - `Combination` - the supcombination
     *   - `Int` - the element that was added
     */
-  def supcombinationsIterator(combination: Combination): Iterator[(Index, Combination, Int)] = {
+  def supcombinationsIndicesIterator(combination: Combination): Iterator[(Index, Int)] = {
     val n = combination.length
 
-    new Iterator[(Index, Combination, Int)] {
+    new Iterator[(Index, Int)] {
       private var currentElementToAdd = combinationElementsSetSize - 1
       private var combinationIndex    = 0
+
+      // Pre-calculate the base index parts that don't change frequently.
+      // Index = sum_{i=0}^{n} combinationsLookup(sup(i), (n+1)-i)
+      private var currentFullIndex = 0L
 
       private def advance(): Unit = {
         while (
@@ -195,26 +210,29 @@ private[sparkpersistenthomology] class CombinatorialNumberSystem(
 
       override def hasNext: Boolean = currentElementToAdd >= 0
 
-      override def next(): (Index, Combination, Int) = {
-        val sup          = new Array[Int](n + 1)
+      override def next(): (Index, Int) = {
         val addedElement = currentElementToAdd
 
-        System.arraycopy(combination, 0, sup, 0, combinationIndex)
-        sup(combinationIndex) = addedElement
-        System.arraycopy(
-          combination,
-          combinationIndex,
-          sup,
-          combinationIndex + 1,
-          n - combinationIndex
-        )
-
-        val index = getIndexFromCombination(sup)
+        // Calculate index incrementally or fully.
+        // For simplicity and correctness first, let's do it efficiently but robustly.
+        // We can optimize this if we see it's still slow.
+        var index = 0L
+        var i     = 0
+        while (i < combinationIndex) {
+          index += combinationsLookup(combination(i), n + 1 - i)
+          i += 1
+        }
+        index += combinationsLookup(addedElement, n + 1 - combinationIndex)
+        i = combinationIndex
+        while (i < n) {
+          index += combinationsLookup(combination(i), n - i)
+          i += 1
+        }
 
         currentElementToAdd -= 1
         advance()
 
-        (index, sup, addedElement)
+        (index, addedElement)
       }
     }
   }

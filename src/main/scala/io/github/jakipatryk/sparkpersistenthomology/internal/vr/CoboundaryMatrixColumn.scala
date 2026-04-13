@@ -18,77 +18,11 @@ import scala.collection.mutable.ArrayBuffer
 private[sparkpersistenthomology] case class CoboundaryMatrixColumn(
   initialSimplex: Simplex,
   simplicesAdded: Array[Simplex],
-  valueTopEntries: Array[Simplex]
+  valueTopEntries: Array[Simplex],
+  isTruncated: Boolean
 ) {
 
-  @inline def pivot: Option[Long] = valueTopEntries.headOption.map(_.index)
-
-  /** Adds two CoboundaryMatrixColumn using fast addition on `valueTopEntries`. Falls back to full
-    * resolution if the fast addition results in too few entries.
-    *
-    * NOTE: This operation is NOT commutative, as the `initialSimplex` of the result is always taken
-    * from the left-hand side operand.
-    *
-    * @example
-    *   {{{
-    *   val result = colA + colB
-    *   assert(result.initialSimplex == colA.initialSimplex)
-    *   }}}
-    */
-  def +(
-    other: CoboundaryMatrixColumn
-  )(implicit context: FiltrationContext): CoboundaryMatrixColumn = {
-    import CoboundaryMatrixColumn._
-
-    val mergedSimplicesAdded = addSimplexChains(
-      this.simplicesAdded,
-      addSimplexChains(other.simplicesAdded, Array(other.initialSimplex))
-    )
-
-    val fastSum = addSimplexChains(this.valueTopEntries, other.valueTopEntries)
-
-    if (fastSum.length >= MinTopEntries) {
-      CoboundaryMatrixColumn(this.initialSimplex, mergedSimplicesAdded, fastSum.take(MaxTopEntries))
-    } else {
-      val thisFull  = this.resolveFullColumnValue
-      val otherFull = other.resolveFullColumnValue
-      val fullSum   = addSimplexChains(thisFull, otherFull)
-      CoboundaryMatrixColumn(this.initialSimplex, mergedSimplicesAdded, fullSum.take(MaxTopEntries))
-    }
-  }
-
-  /** Resolves the full value of this column (coboundary chain). */
-  def resolveFullColumnValue(implicit context: FiltrationContext): Array[Simplex] = {
-    import CoboundaryMatrixColumn.simplexOrdering
-
-    val pqs =
-      (initialSimplex +: simplicesAdded).map(CoboundaryMatrixColumn.resolveInitialCoboundary)
-
-    val metaPq = PriorityQueue.empty[PriorityQueue[Simplex]](
-      Ordering.by((pq: PriorityQueue[Simplex]) => pq.head)
-    )
-    for (pq <- pqs if pq.nonEmpty) metaPq.enqueue(pq)
-
-    val result = scala.collection.mutable.ArrayBuffer[Simplex]()
-    while (metaPq.nonEmpty) {
-      val topPq          = metaPq.dequeue()
-      val currentElement = topPq.dequeue()
-      if (topPq.nonEmpty) metaPq.enqueue(topPq)
-
-      var count = 1
-      while (metaPq.nonEmpty && metaPq.head.head == currentElement) {
-        val samePq = metaPq.dequeue()
-        samePq.dequeue()
-        if (samePq.nonEmpty) metaPq.enqueue(samePq)
-        count += 1
-      }
-
-      if (count % 2 != 0) {
-        result.append(currentElement)
-      }
-    }
-    result.toArray
-  }
+  @inline def pivot: Option[Simplex] = valueTopEntries.headOption
 
 }
 
@@ -97,22 +31,18 @@ private[sparkpersistenthomology] object CoboundaryMatrixColumn {
   import org.apache.spark.sql.Column
   import org.apache.spark.sql.functions.{ coalesce, col, expr, lit }
 
-  final val MinTopEntries: Int = 5
-  final val MaxTopEntries: Int = 100
+  final val MinTopEntries: Int = 1000
+  final val MaxTopEntries: Int = 10000
 
-  implicit val simplexOrdering: Ordering[Simplex] = Ordering.by(s => (s.radius, -s.index))
+  implicit val reverseSimplexFiltrationOrdering: Ordering[Simplex] =
+    Ordering.by(s => (-s.radius, s.index))
 
-  /** Spark SQL column expressions that sort columns by -simplexOrdering of their initialSimplex. */
-  val matrixColumnsOrderingExpressions: Seq[Column] = Seq(
+  val reverseColumnsFiltrationOrderingExpressions: Seq[Column] = Seq(
     col("initialSimplex.radius").desc,
     col("initialSimplex.index").asc
   )
 
   /** Returns a Catalyst expression to extract the pivot index directly from Tungsten binary format.
-    *
-    * This avoids the serialization/deserialization overhead of extracting the pivot via `map` on
-    * the Dataset. The pivot is the `index` of the first element in the `valueTopEntries` array. If
-    * the array is empty, it returns -1L.
     */
   def pivotExpression: Column = {
     coalesce(
@@ -121,38 +51,57 @@ private[sparkpersistenthomology] object CoboundaryMatrixColumn {
     )
   }
 
-  /** Creates a new CoboundaryMatrixColumn from an initial simplex.
-    *
-    * @param initialSimplex
-    *   The simplex to use as the initial simplex of the column.
-    */
+  /** Creates a new CoboundaryMatrixColumn from an initial simplex. */
   def apply(
     initialSimplex: Simplex
   )(implicit context: FiltrationContext): CoboundaryMatrixColumn = {
-    val initialCoboundary = resolveInitialCoboundary(initialSimplex)
-    val n                 = math.min(initialCoboundary.size, MaxTopEntries)
-    val topEntries        = Iterator.continually(initialCoboundary.dequeue()).take(n).toArray
-    CoboundaryMatrixColumn(initialSimplex, Array.empty[Simplex], topEntries)
+    val fullEntries = initialSimplex.getCofacets.toArray
+    scala.util.Sorting.quickSort(fullEntries)(reverseSimplexFiltrationOrdering.reverse)
+    val isTruncated = fullEntries.length > MaxTopEntries
+    val topEntries  = fullEntries.take(MaxTopEntries)
+    CoboundaryMatrixColumn(initialSimplex, Array.empty[Simplex], topEntries, isTruncated)
   }
 
-  /** Resolves the full initial coboundary in the coboundary matrix for a given simplex.
-    *
-    * @param simplex
-    *   The simplex for which to resolve the initial coboundary.
-    * @return
-    *   A max-heap (PriorityQueue) of cofacets ordered first by radius (descending priority), then
-    *   by reversed index (ascending priority).
-    */
-  def resolveInitialCoboundary(simplex: Simplex)(implicit
-    context: FiltrationContext
-  ): PriorityQueue[Simplex] = {
-    val pq = PriorityQueue.empty[Simplex]
-    pq ++= simplex.getCofacets
-    pq
+  /** Returns an unsorted iterator of all cofacets belonging to this column's components. */
+  private[vr] def getAllCofacetsIterator(
+    initialSimplex: Simplex,
+    simplicesAdded: Array[Simplex]
+  )(implicit context: FiltrationContext): Iterator[Simplex] = {
+    initialSimplex.getCofacets ++ simplicesAdded.iterator.flatMap(_.getCofacets)
+  }
+
+  /** Calculates how many elements in a fast sum are "reliable" (not affected by truncation). */
+  private[vr] def calculateValidLength(
+    fastSum: Array[Simplex],
+    thisTruncated: Boolean,
+    thisTop: Array[Simplex],
+    otherTruncated: Boolean,
+    otherTop: Array[Simplex]
+  ): Int = {
+    var validLength = fastSum.length
+    if (thisTruncated) {
+      if (thisTop.isEmpty) {
+        validLength = 0
+      } else {
+        val bound = thisTop.last
+        val idx   = fastSum.indexWhere(s => reverseSimplexFiltrationOrdering.compare(s, bound) < 0)
+        if (idx != -1) validLength = math.min(validLength, idx)
+      }
+    }
+    if (otherTruncated) {
+      if (otherTop.isEmpty) {
+        validLength = 0
+      } else {
+        val bound = otherTop.last
+        val idx   = fastSum.indexWhere(s => reverseSimplexFiltrationOrdering.compare(s, bound) < 0)
+        if (idx != -1) validLength = math.min(validLength, idx)
+      }
+    }
+    validLength
   }
 
   /** Merges two arrays of Simplices, sorted by `simplexOrdering` descending, modulo 2. */
-  private def addSimplexChains(
+  private[vr] def addSimplexChains(
     a: Array[Simplex],
     b: Array[Simplex]
   ): Array[Simplex] = {
@@ -160,7 +109,7 @@ private[sparkpersistenthomology] object CoboundaryMatrixColumn {
     var i      = 0
     var j      = 0
     while (i < a.length && j < b.length) {
-      val cmp = simplexOrdering.compare(a(i), b(j))
+      val cmp = reverseSimplexFiltrationOrdering.compare(a(i), b(j))
       if (cmp > 0) {
         result += a(i)
         i += 1

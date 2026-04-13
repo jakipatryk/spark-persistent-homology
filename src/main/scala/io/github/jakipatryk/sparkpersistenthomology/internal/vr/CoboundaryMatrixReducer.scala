@@ -21,10 +21,10 @@ object CoboundaryMatrixReducer {
   )(implicit context: FiltrationContext, spark: SparkSession): Dataset[CoboundaryMatrixColumn] = {
     import spark.implicits._
 
-    var currentMatrix   = coboundaryMatrix
-    var hasPivotChanged = true
+    var currentMatrix          = coboundaryMatrix
+    var shouldContinueReducing = true
 
-    while (hasPivotChanged) {
+    while (shouldContinueReducing) {
       val partitionedAndSortedMatrix = repartitionAndSort(
         currentMatrix,
         pivotStatsAccumulator
@@ -40,9 +40,13 @@ object CoboundaryMatrixReducer {
         reducedIterator
       }
 
+      val prevMatrix = currentMatrix
       currentMatrix = nextMatrix.localCheckpoint()
+      if (prevMatrix ne coboundaryMatrix) {
+        prevMatrix.unpersist(false)
+      }
 
-      hasPivotChanged = pivotStatsAccumulator.value.hasPivotChanged
+      shouldContinueReducing = pivotStatsAccumulator.value.hasPivotChanged
     }
 
     currentMatrix
@@ -56,7 +60,6 @@ object CoboundaryMatrixReducer {
 
     val stats         = pivotStatsAccumulator.value
     val numPartitions = spark.conf.get("spark.sql.shuffle.partitions").toInt
-
     val partitionIdExpr = PartitioningUtils.getPartitionId(
       CoboundaryMatrixColumn.pivotExpression,
       stats,
@@ -66,7 +69,7 @@ object CoboundaryMatrixReducer {
     coboundaryMatrix
       .withColumn("_partition_id", partitionIdExpr)
       .repartition(numPartitions, col("_partition_id"))
-      .sortWithinPartitions(CoboundaryMatrixColumn.matrixColumnsOrderingExpressions: _*)
+      .sortWithinPartitions(CoboundaryMatrixColumn.reverseColumnsFiltrationOrderingExpressions: _*)
       .drop("_partition_id")
       .as[CoboundaryMatrixColumn]
   }
@@ -81,25 +84,39 @@ object CoboundaryMatrixReducer {
     val pivotMap = LongMap.empty[CoboundaryMatrixColumn]
 
     val reducedIterator = partition.map { col =>
-      var currentCol = col
-      var pivotOpt   = currentCol.pivot
+      val mutableCol = MutableCoboundaryMatrixColumn(col)
+      var pOpt       = mutableCol.pivot
+      var isDone     = false
 
-      if (pivotOpt.isDefined) {
-        while (pivotOpt.isDefined && pivotMap.contains(pivotOpt.get)) {
-          stats.hasPivotChanged = true
-          val prevCol = pivotMap(pivotOpt.get)
-          currentCol = currentCol + prevCol
-          pivotOpt = currentCol.pivot
-        }
+      while (pOpt.isDefined && !isDone) {
+        val p      = pOpt.get
+        val pIndex = p.index
 
-        if (pivotOpt.isDefined) {
-          val p = pivotOpt.get
-          pivotMap.put(p, currentCol)
-          stats.addPivot(p)
+        pivotMap.get(pIndex) match {
+          case Some(prevCol) =>
+            stats.hasPivotChanged = true
+            mutableCol += prevCol
+            pOpt = mutableCol.pivot
+          case None =>
+            ApparentPairsDetector.getBirthIfIsDeathOfApparentPair(p) match {
+              case Some(birthSimplex) =>
+                stats.hasPivotChanged = true
+                mutableCol += birthSimplex
+                pOpt = mutableCol.pivot
+              case None =>
+                isDone = true
+            }
         }
       }
 
-      currentCol
+      val result = mutableCol.toImmutableAndDrain
+
+      pOpt.map(_.index).foreach { p =>
+        pivotMap.put(p, result)
+        stats.addPivot(p)
+      }
+
+      result
     }
 
     (reducedIterator, stats)

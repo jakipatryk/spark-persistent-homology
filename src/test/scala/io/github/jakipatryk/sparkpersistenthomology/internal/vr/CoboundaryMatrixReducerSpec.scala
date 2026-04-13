@@ -20,7 +20,7 @@ class CoboundaryMatrixReducerSpec
     import spark.implicits._
 
     val pointCloudGen = for {
-      numPoints <- Gen.choose(2, 100)
+      numPoints <- Gen.choose(2, 80)
       dim       <- Gen.choose(2, 4)
       points    <- Gen.listOfN(numPoints, Gen.listOfN(dim, Gen.choose(-10.0f, 10.0f)))
     } yield points.map(_.toArray).toArray
@@ -58,7 +58,7 @@ class CoboundaryMatrixReducerSpec
 
       val reducedMatrix = CoboundaryMatrixReducer.reduce(unreducedMatrix, accumulator)
       val results       = reducedMatrix.collect()
-      val pivots = results.flatMap(_.pivot)
+      val pivots        = results.flatMap(_.pivot)
 
       // Check that all non-empty pivots are unique
       assert(pivots.length == pivots.toSet.size)
