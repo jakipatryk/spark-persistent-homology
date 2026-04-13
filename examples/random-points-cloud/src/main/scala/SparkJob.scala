@@ -1,18 +1,15 @@
-import io.github.jakipatryk.sparkpersistenthomology.PersistentHomology
-import io.github.jakipatryk.sparkpersistenthomology.PointsCloud
-import io.github.jakipatryk.sparkpersistenthomology.distances.DistanceCalculator
-import io.github.jakipatryk.sparkpersistenthomology.filtrations.VietorisRipsFiltrationCreator
+import io.github.jakipatryk.sparkpersistenthomology.{PersistencePair, PersistentHomology}
 import io.github.jakipatryk.sparkpersistenthomology.persistenceimage.{BirthAndPersistenceBoundsConfig, PersistenceImage}
+import org.apache.spark.sql.{Dataset, SparkSession}
 import org.apache.spark.{SparkConf, SparkContext}
 
-import scala.util.{Failure, Random, Success}
+import scala.util.Random
 
 case class Config(
                    numberOfPoints: Int = 50,
                    dim: Int = 8,
                    maxSimplicesDim: Int = 3,
-                   computePersistenceImage: Boolean = false,
-                   numberOfPartitions: Option[Int] = None
+                   computePersistenceImage: Boolean = false
                  )
 
 object Config {
@@ -36,10 +33,7 @@ object Config {
         .text("max dimension of simplices in Vietoris-Rips filtration of the generated points cloud"),
       opt[Boolean] ("computePersistenceImage")
         .action((computePersistenceImage, c) => c.copy(computePersistenceImage = computePersistenceImage))
-        .text("should the last step of the job be persistence image or just persistence pairs"),
-      opt[Int] ("numberOfPartitions")
-        .action((numberOfPartitions, c) => c.copy(numberOfPartitions = Some(numberOfPartitions)))
-        .text("number of partitions used to compute persistence pairs")
+        .text("should the last step of the job be persistence image or just persistence pairs")
     )
   }
 
@@ -49,63 +43,75 @@ object Config {
 
 object SparkJob {
 
-  private implicit val sparkContext: SparkContext = {
-    new SparkContext(
-      new SparkConf()
-        .setAppName(
-          "Example of io.github.jakipatryk.spark-persistent-homology usage " +
-            "- random points cloud, computing persistence pairs (and optionally persistence image)"
-        )
-        .set("spark.serializer", "org.apache.spark.serializer.KryoSerializer")
-    )
+  private implicit val sparkSession: SparkSession = {
+    SparkSession.builder()
+      .config(
+        new SparkConf()
+          .setAppName(
+            "Example of io.github.jakipatryk.spark-persistent-homology usage " +
+              "- random points cloud, computing persistence pairs (and optionally persistence image)"
+          )
+      )
+      .getOrCreate()
   }
 
   def main(args: Array[String]): Unit = {
     val parsedConfig = Config.getConfig(args)
 
     parsedConfig match {
-      case Some(Config(numberOfPoints, dim, maxHomologyDim, computePersistenceImage, numberOfPartitions)) =>
+      case Some(Config(numberOfPoints, dim, maxHomologyDim, computePersistenceImage)) =>
         val pointsCloud = generatePointsCloud(dim, numberOfPoints)
 
-        val persistencePairs = PersistentHomology.getPersistencePairs(
+        val persistencePairsArray = PersistentHomology.computePersistentHomology(
           pointsCloud,
-          numOfPartitionsConf = numberOfPartitions,
-          maxDim = Some(maxHomologyDim)
+          maxDim = maxHomologyDim
         )
 
         if(computePersistenceImage) {
           // not including dim 0
-          val dimensionsToInclude = (1 to maxHomologyDim).map(_ -> BirthAndPersistenceBoundsConfig()).toMap
-          val numberOfPixelsOnBirthAxisPerDim = 100
+          val numberOfPixelsOnBirthAxis = 100
           val numberOfPixelsOnPersistenceAxis = 100
           val variance = 1.0
-          val computedImage = PersistenceImage.fromPersistencePairsGaussian(
-            persistencePairs,
-            dimensionsToInclude,
-            numberOfPixelsOnBirthAxisPerDim,
-            numberOfPixelsOnPersistenceAxis,
-            variance
-          )
-          computedImage match {
-            case Success(img) =>
-              img.image.foreach(v => println(v.mkString(",")))
-            case Failure(exception) =>
-              println(s"Failed to generate persistence image, reason: ${exception.getMessage}")
+
+          for (d <- 1 to maxHomologyDim) {
+            println(s"Persistence image for dimension $d:")
+            val pairsForDim = persistencePairsArray(d)
+            try {
+              val computedImage = PersistenceImage.fromPersistencePairsGaussian(
+                pairsForDim,
+                BirthAndPersistenceBoundsConfig(),
+                numberOfPixelsOnBirthAxis,
+                numberOfPixelsOnPersistenceAxis,
+                variance
+              )
+
+              val img = computedImage.image
+              for (i <- 0 until img.numRows) {
+                val row = for (j <- 0 until img.numCols) yield img(i, j)
+                println(row.mkString(","))
+              }
+            } catch {
+              case exception: Exception =>
+                println(s"Failed to generate persistence image for dimension $d, reason: ${exception.getMessage}")
+            }
           }
         } else {
-          val numberOfPersistencePairs = persistencePairs.count()
-          println(s"Number of persistence pairs is $numberOfPersistencePairs")
+          for (d <- 0 to maxHomologyDim) {
+            val numberOfPersistencePairs = persistencePairsArray(d).count()
+            println(s"Number of persistence pairs for dimension $d is $numberOfPersistencePairs")
+          }
         }
+      case None =>
     }
 
-    sparkContext.stop()
+    sparkSession.stop()
   }
 
-  private def generatePointsCloud(dim: Int, numberOfPoints: Int): PointsCloud = {
-    val scalingFactor = 1000.0
-    val randomPoints = Seq.fill(numberOfPoints)(Vector.fill(dim)(scalingFactor * Random.nextDouble))
-    val rdd = sparkContext.parallelize(randomPoints)
-    PointsCloud(rdd)
+  private def generatePointsCloud(dim: Int, numberOfPoints: Int): Dataset[Array[Float]] = {
+    import sparkSession.implicits._
+    val scalingFactor = 1000.0f
+    val randomPoints = Seq.fill(numberOfPoints)(Array.fill(dim)(scalingFactor * Random.nextFloat()))
+    sparkSession.createDataset(randomPoints)
   }
 
 }

@@ -14,9 +14,8 @@ sbt assembly
 ### CLI arguments
 - `--numberOfPoints` - number of points in the generated random points cloud, by default `50`
 - `--dim` - dimension of points in the generated random points cloud, by default `8`
-- `--maxSimplicesDim` - max dimension of simplices in Vietoris-Rips filtration of the generated points cloud, by default `3` (so job will generate homology classes up to dim 3, but dim 3 classes will never die so their death is going to be infinity)
+- `--maxSimplicesDim` - max dimension of homology to compute, by default `3`
 - `--computePersistenceImage` - should the last step of the job be persistence image or just persistence pairs, by default `false`
-- `--numberOfPartitions` - number of partitions used to compute persistence pairs, by default None (automatically determined by the library)
 
 ### Example of spark-submit
 ```
