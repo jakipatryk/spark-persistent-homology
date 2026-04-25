@@ -98,9 +98,9 @@ private[vr] class MutableCoboundaryMatrixColumn(
     if (
       validLength >= CoboundaryMatrixColumn.MinTopEntries || (!this.isTruncated && !otherIsTruncated)
     ) {
-      valueTopEntries = fastSum.take(CoboundaryMatrixColumn.MaxTopEntries)
-      isTruncated =
-        fastSum.length > CoboundaryMatrixColumn.MaxTopEntries || this.isTruncated || otherIsTruncated
+      val numToKeep = math.min(validLength, CoboundaryMatrixColumn.MaxTopEntries)
+      valueTopEntries = fastSum.take(numToKeep)
+      isTruncated = fastSum.length > numToKeep || this.isTruncated || otherIsTruncated
     } else {
       // Switch to heap mode and populate it from the "ground truth" components.
       val pq =
