@@ -86,32 +86,31 @@ object CoboundaryMatrixReducer {
     val reducedIterator = partition.map { col =>
       val mutableCol = MutableCoboundaryMatrixColumn(col)
       var pOpt       = mutableCol.pivot
-      var isDone     = false
 
-      while (pOpt.isDefined && !isDone) {
-        val p      = pOpt.get
-        val pIndex = p.index
+      while (pOpt.isDefined && pivotMap.contains(pOpt.get.index)) {
+        stats.hasPivotChanged = true
+        mutableCol += pivotMap(pOpt.get.index)
+        pOpt = mutableCol.pivot
+      }
 
-        pivotMap.get(pIndex) match {
+      val definitivePivot = pOpt
+      if (definitivePivot.isDefined) {
+        mutableCol.dequeueToBuffer()
+      }
+
+      while (mutableCol.nonEmpty) {
+        val currentElement = mutableCol.pivot.get
+        pivotMap.get(currentElement.index) match {
           case Some(prevCol) =>
-            stats.hasPivotChanged = true
             mutableCol += prevCol
-            pOpt = mutableCol.pivot
           case None =>
-            ApparentPairsDetector.getBirthIfIsDeathOfApparentPair(p) match {
-              case Some(birthSimplex) =>
-                stats.hasPivotChanged = true
-                mutableCol += birthSimplex
-                pOpt = mutableCol.pivot
-              case None =>
-                isDone = true
-            }
+            mutableCol.dequeueToBuffer()
         }
       }
 
       val result = mutableCol.toImmutableAndDrain
 
-      pOpt.map(_.index).foreach { p =>
+      definitivePivot.map(_.index).foreach { p =>
         pivotMap.put(p, result)
         stats.addPivot(p)
       }
