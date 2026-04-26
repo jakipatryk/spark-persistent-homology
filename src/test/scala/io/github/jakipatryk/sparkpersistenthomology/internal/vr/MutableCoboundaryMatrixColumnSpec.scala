@@ -34,7 +34,7 @@ class MutableCoboundaryMatrixColumnSpec extends AnyFlatSpec with SharedSparkCont
     val col     = CoboundaryMatrixColumn(simplex)
     val mutable = MutableCoboundaryMatrixColumn(col)
 
-    val resolved = mutable.toImmutableAndDrain.valueTopEntries
+    val resolved = mutable.toImmutableAndDrain.value
 
     val expectedChain = List(
       Simplex(1L, 2.toByte, 1.4142135f),
@@ -47,7 +47,7 @@ class MutableCoboundaryMatrixColumnSpec extends AnyFlatSpec with SharedSparkCont
 
   behavior of "+="
 
-  it should "add two columns using fast addition on valueTopEntries when fast sum >= MinTopEntries" in {
+  it should "add two columns correctly using full values" in {
     val distanceCalculator = DistanceCalculator.EuclideanDistanceCalculator
     val pointsCloud        = Array.tabulate(10)(i => Array(i.toFloat, 0.0f))
     val cns                = CombinatorialNumberSystem(10, 3)
@@ -63,42 +63,16 @@ class MutableCoboundaryMatrixColumnSpec extends AnyFlatSpec with SharedSparkCont
 
     val initial1 = Simplex(index = 0L, dim = simplexDim, radius = 1.0f)
     val col1     = CoboundaryMatrixColumn(initial1)
-    val fullEntries1 =
-      MutableCoboundaryMatrixColumn(col1).toImmutableAndDrain.valueTopEntries
-
-    val maxEntries = CoboundaryMatrixColumn.MaxTopEntries
-    val topEntries1 =
-      fullEntries1.padTo(maxEntries, Simplex(998L, 2.toByte, Float.PositiveInfinity))
-
-    val col1Truncated = CoboundaryMatrixColumn(
-      initialSimplex = initial1,
-      simplicesAdded = Array.empty,
-      valueTopEntries = topEntries1,
-      isTruncated = true
-    )
 
     val initial2 = Simplex(index = 1L, dim = simplexDim, radius = 2.0f)
     val col2     = CoboundaryMatrixColumn(initial2)
-    val fullEntries2 =
-      MutableCoboundaryMatrixColumn(col2).toImmutableAndDrain.valueTopEntries
-    val topEntries2 =
-      fullEntries2.padTo(maxEntries, Simplex(999L, 2.toByte, Float.PositiveInfinity))
 
-    val col2NotTruncated = CoboundaryMatrixColumn(
-      initialSimplex = initial2,
-      simplicesAdded = Array.empty,
-      valueTopEntries = topEntries2,
-      isTruncated = false
-    )
-
-    val mutable = MutableCoboundaryMatrixColumn(col1Truncated)
-    mutable += col2NotTruncated
+    val mutable = MutableCoboundaryMatrixColumn(col1)
+    mutable += col2
     val result = mutable.toImmutableAndDrain
 
     assert(result.initialSimplex === initial1)
-    assert(result.simplicesAdded.toList === List(initial2))
 
-    val expectedCount = math.min(14, maxEntries)
     val expectedTopEntries = Array(
       Simplex(2L, 2.toByte, 3.0f),
       Simplex(1L, 2.toByte, 3.0f),
@@ -114,116 +88,12 @@ class MutableCoboundaryMatrixColumnSpec extends AnyFlatSpec with SharedSparkCont
       Simplex(56L, 2.toByte, 8.0f),
       Simplex(85L, 2.toByte, 9.0f),
       Simplex(84L, 2.toByte, 9.0f)
-    ).take(expectedCount)
+    )
 
-    assert(result.valueTopEntries.take(expectedCount).toSeq === expectedTopEntries.toSeq)
-    assert(result.isTruncated === true)
+    assert(result.value.toSeq === expectedTopEntries.toSeq)
   }
 
-  it should "fallback to heap mode when fast sum yields few entries" in {
-    val distanceCalculator = DistanceCalculator.EuclideanDistanceCalculator
-    val pointsCloud = Array(
-      Array(0.0f, 0.0f),
-      Array(1.0f, 0.0f),
-      Array(0.0f, 1.0f),
-      Array(1.0f, 1.0f)
-    )
-    val cns              = CombinatorialNumberSystem(4, 3)
-    val simplexDim: Byte = 1
-
-    implicit val context: FiltrationContext =
-      FiltrationContext(
-        sparkContext.broadcast(cns),
-        sparkContext.broadcast(pointsCloud),
-        distanceCalculator,
-        Float.PositiveInfinity
-      )
-
-    val initial1 = Simplex(index = 0L, dim = simplexDim, radius = 1.0f)
-    val col1     = CoboundaryMatrixColumn(initial1)
-    val topEntries1 =
-      MutableCoboundaryMatrixColumn(col1).toImmutableAndDrain.valueTopEntries
-
-    val col1Truncated = CoboundaryMatrixColumn(
-      initialSimplex = initial1,
-      simplicesAdded = Array.empty,
-      valueTopEntries = topEntries1,
-      isTruncated = true
-    )
-
-    val initial2 = Simplex(index = 1L, dim = simplexDim, radius = 1.0f)
-    val col2     = CoboundaryMatrixColumn(initial2)
-    val topEntries2 =
-      MutableCoboundaryMatrixColumn(col2).toImmutableAndDrain.valueTopEntries
-
-    val col2NotTruncated = CoboundaryMatrixColumn(
-      initialSimplex = initial2,
-      simplicesAdded = Array.empty,
-      valueTopEntries = topEntries2,
-      isTruncated = false
-    )
-
-    val mutable = MutableCoboundaryMatrixColumn(col1Truncated)
-    mutable += col2NotTruncated
-    val result = mutable.toImmutableAndDrain
-
-    assert(result.initialSimplex === initial1)
-    assert(result.simplicesAdded.toList === List(initial2))
-
-    val expectedTopEntries = Array(
-      Simplex(2L, 2.toByte, 1.4142135f),
-      Simplex(1L, 2.toByte, 1.4142135f)
-    )
-    assert(result.valueTopEntries === expectedTopEntries)
-  }
-
-  it should "discard invalid elements from fast sum when operands are truncated" in {
-    val distanceCalculator = DistanceCalculator.EuclideanDistanceCalculator
-    val pointsCloud        = Array.tabulate(5)(i => Array(i.toFloat, 0.0f))
-    val cns                = CombinatorialNumberSystem(5, 3)
-    val simplexDim: Byte   = 1
-
-    implicit val context: FiltrationContext =
-      FiltrationContext(
-        sparkContext.broadcast(cns),
-        sparkContext.broadcast(pointsCloud),
-        distanceCalculator,
-        Float.PositiveInfinity
-      )
-
-    val maxEntries = CoboundaryMatrixColumn.MaxTopEntries
-
-    val initial1    = Simplex(index = 0L, dim = simplexDim, radius = 1.0f)
-    val bound1      = Simplex(100L, 2.toByte, 10.0f)
-    val topEntries1 = Array(Simplex(10L, 2.toByte, 3.0f)).padTo(maxEntries, bound1)
-
-    val col1 = CoboundaryMatrixColumn(
-      initialSimplex = initial1,
-      simplicesAdded = Array.empty,
-      valueTopEntries = topEntries1,
-      isTruncated = true
-    )
-
-    val initial2       = Simplex(index = 1L, dim = simplexDim, radius = 2.0f)
-    val invalidElement = Simplex(200L, 2.toByte, 15.0f)
-    val bound2         = Simplex(200L, 2.toByte, 20.0f)
-    val topEntries2 = Array(Simplex(20L, 2.toByte, 4.0f), invalidElement).padTo(maxEntries, bound2)
-
-    val col2 = CoboundaryMatrixColumn(
-      initialSimplex = initial2,
-      simplicesAdded = Array.empty,
-      valueTopEntries = topEntries2,
-      isTruncated = false
-    )
-
-    val mutable = MutableCoboundaryMatrixColumn(col1)
-    mutable += col2
-    val result = mutable.toImmutableAndDrain
-
-    assert(!result.valueTopEntries.contains(invalidElement))
-  }
-
-  it should "correctly add a single birthSimplex coboundary" in {
+  it should "add birth simplex correctly" in {
     val distanceCalculator = DistanceCalculator.EuclideanDistanceCalculator
     val pointsCloud = Array(
       Array(0.0f, 0.0f),
@@ -255,8 +125,7 @@ class MutableCoboundaryMatrixColumnSpec extends AnyFlatSpec with SharedSparkCont
       Simplex(2L, 2.toByte, 1.4142135f),
       Simplex(1L, 2.toByte, 1.4142135f)
     )
-    assert(result.valueTopEntries === expectedTopEntries)
-    assert(result.simplicesAdded.toList === List(birthSimplex))
-  }
 
+    assert(result.value.toSeq === expectedTopEntries.toSeq)
+  }
 }

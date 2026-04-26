@@ -41,9 +41,7 @@ class CoboundaryMatrixConstructorSpec extends AnyFlatSpec with SharedSparkContex
     // Simplex(1, 1) has index 1, dim 1.
     val colWithPivot1 = CoboundaryMatrixColumn(
       initialSimplex = Simplex(0, 0, 0.0f),
-      simplicesAdded = Array.empty,
-      valueTopEntries = Array(Simplex(1, 1, 1.0f)),
-      isTruncated = false
+      value = Array(Simplex(1, 1, 1.0f))
     )
     val previousDimResult: Dataset[CoboundaryMatrixColumn] = spark.createDataset(Seq(colWithPivot1))
 
