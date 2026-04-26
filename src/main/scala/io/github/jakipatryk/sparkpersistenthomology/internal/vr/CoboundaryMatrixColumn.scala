@@ -24,8 +24,15 @@ private[sparkpersistenthomology] object CoboundaryMatrixColumn {
   import org.apache.spark.sql.Column
   import org.apache.spark.sql.functions.{ coalesce, col, expr, lit }
 
-  implicit val reverseSimplexFiltrationOrdering: Ordering[Simplex] =
-    Ordering.by(s => (-s.radius, s.index))
+  implicit val reverseSimplexFiltrationOrdering: Ordering[Simplex] = new Ordering[Simplex] {
+    override def compare(x: Simplex, y: Simplex): Int = {
+      val radiusCmp = java.lang.Float.compare(y.radius, x.radius)
+      if (radiusCmp != 0) radiusCmp
+      else java.lang.Long.compare(x.index, y.index)
+    }
+  }
+
+  val simplexFiltrationOrdering: Ordering[Simplex] = reverseSimplexFiltrationOrdering.reverse
 
   val reverseColumnsFiltrationOrderingExpressions: Seq[Column] = Seq(
     col("initialSimplex.radius").desc,
@@ -46,7 +53,7 @@ private[sparkpersistenthomology] object CoboundaryMatrixColumn {
     initialSimplex: Simplex
   )(implicit context: FiltrationContext): CoboundaryMatrixColumn = {
     val fullEntries = initialSimplex.getCofacets.toArray
-    scala.util.Sorting.quickSort(fullEntries)(reverseSimplexFiltrationOrdering.reverse)
+    scala.util.Sorting.quickSort(fullEntries)(simplexFiltrationOrdering)
     CoboundaryMatrixColumn(initialSimplex, fullEntries)
   }
 

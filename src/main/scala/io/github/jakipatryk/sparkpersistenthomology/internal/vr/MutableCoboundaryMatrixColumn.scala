@@ -24,7 +24,7 @@ private[vr] class MutableCoboundaryMatrixColumn(
   def +=(birthSimplex: Simplex): Unit = {
     val cofacets = birthSimplex.getCofacets.toArray
     scala.util.Sorting.quickSort(cofacets)(
-      CoboundaryMatrixColumn.reverseSimplexFiltrationOrdering.reverse
+      CoboundaryMatrixColumn.simplexFiltrationOrdering
     )
     queue += cofacets
   }

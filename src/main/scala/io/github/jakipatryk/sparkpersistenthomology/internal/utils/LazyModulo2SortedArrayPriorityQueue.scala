@@ -21,7 +21,7 @@ private[sparkpersistenthomology] class LazyModulo2SortedArrayPriorityQueue[T: Cl
 
   def +=(sortedArray: Array[T]): Unit = {
     if (sortedArray.nonEmpty) {
-      pq.enqueue(new ArrayWrapper(sortedArray, 0))
+      pq += new ArrayWrapper(sortedArray, 0)
       nextElement = None
     }
   }
@@ -36,12 +36,12 @@ private[sparkpersistenthomology] class LazyModulo2SortedArrayPriorityQueue[T: Cl
   def dequeue(): T = {
     val res = peek.getOrElse(throw new NoSuchElementException("dequeue on empty queue"))
 
-    while (pq.nonEmpty && ordering.equiv(pq.head.array(pq.head.index), res)) {
+    while (pq.nonEmpty && ordering.compare(pq.head.array(pq.head.index), res) == 0) {
       val w = pq.dequeue()
-      while (w.index < w.array.length && ordering.equiv(w.array(w.index), res)) {
+      while (w.index < w.array.length && ordering.compare(w.array(w.index), res) == 0) {
         w.index += 1
       }
-      if (w.index < w.array.length) pq.enqueue(w)
+      if (w.index < w.array.length) pq += w
     }
 
     nextElement = None
@@ -82,26 +82,31 @@ private[sparkpersistenthomology] class LazyModulo2SortedArrayPriorityQueue[T: Cl
 
   override def clone(): LazyModulo2SortedArrayPriorityQueue[T] = {
     val newQueue = new LazyModulo2SortedArrayPriorityQueue[T]()
-    this.pq.foreach(w => newQueue.pq.enqueue(w.copy()))
+    this.pq.foreach(w => newQueue.pq += w.copy())
     newQueue.nextElement = this.nextElement
     newQueue.resultBuffer ++= this.resultBuffer
     newQueue
   }
 
+  private val seenWrappers = mutable.ArrayBuffer.empty[ArrayWrapper[T]]
+
   private def fetchNext(): Option[T] = {
     while (pq.nonEmpty) {
       val currentMax = pq.head.array(pq.head.index)
 
-      var count        = 0
-      val seenWrappers = mutable.ArrayBuffer.empty[ArrayWrapper[T]]
+      var count = 0
+      seenWrappers.clear()
 
-      while (pq.nonEmpty && ordering.equiv(pq.head.array(pq.head.index), currentMax)) {
+      while (pq.nonEmpty && ordering.compare(pq.head.array(pq.head.index), currentMax) == 0) {
         val w = pq.dequeue()
         seenWrappers += w
 
         var internalIndex = w.index
         while (
-          internalIndex < w.array.length && ordering.equiv(w.array(internalIndex), currentMax)
+          internalIndex < w.array.length && ordering.compare(
+            w.array(internalIndex),
+            currentMax
+          ) == 0
         ) {
           count += 1
           internalIndex += 1
@@ -109,14 +114,21 @@ private[sparkpersistenthomology] class LazyModulo2SortedArrayPriorityQueue[T: Cl
       }
 
       if (count % 2 != 0) {
-        pq ++= seenWrappers
+        var i = 0
+        while (i < seenWrappers.length) {
+          pq += seenWrappers(i)
+          i += 1
+        }
         return Some(currentMax)
       } else {
-        seenWrappers.foreach { w =>
-          while (w.index < w.array.length && ordering.equiv(w.array(w.index), currentMax)) {
+        var i = 0
+        while (i < seenWrappers.length) {
+          val w = seenWrappers(i)
+          while (w.index < w.array.length && ordering.compare(w.array(w.index), currentMax) == 0) {
             w.index += 1
           }
-          if (w.index < w.array.length) pq.enqueue(w)
+          if (w.index < w.array.length) pq += w
+          i += 1
         }
       }
     }

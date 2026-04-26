@@ -24,8 +24,8 @@ private[sparkpersistenthomology] object ApparentPairsDetector extends Serializab
     death: Simplex
   )(implicit context: FiltrationContext): Option[Simplex] = {
     if (death.dim > 0) {
-      findFirstWithSameRadius(death.getFacets, death.radius).flatMap { facet =>
-        findFirstWithSameRadius(facet.getCofacets, facet.radius)
+      death.getFirstFacetWithSameRadius.flatMap { facet =>
+        facet.getFirstCofacetWithSameRadius
           .filter(_.index == death.index)
           .map(_ => facet)
       }
@@ -43,17 +43,10 @@ private[sparkpersistenthomology] object ApparentPairsDetector extends Serializab
   private def isBirthOfApparentPair(
     simplex: Simplex
   )(implicit context: FiltrationContext): Boolean = {
-    findFirstWithSameRadius(simplex.getCofacets, simplex.radius)
-      .flatMap(cofacet => findFirstWithSameRadius(cofacet.getFacets, cofacet.radius))
+    simplex.getFirstCofacetWithSameRadius
+      .flatMap(cofacet => cofacet.getFirstFacetWithSameRadius)
       .map(_.index == simplex.index)
       .getOrElse(false)
-  }
-
-  private def findFirstWithSameRadius(
-    simplices: Iterator[Simplex],
-    targetRadius: Float
-  ): Option[Simplex] = {
-    simplices.find(_.radius == targetRadius)
   }
 
 }
