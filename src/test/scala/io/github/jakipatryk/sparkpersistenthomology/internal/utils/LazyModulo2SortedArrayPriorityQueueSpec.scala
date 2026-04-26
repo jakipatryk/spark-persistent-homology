@@ -55,7 +55,7 @@ class LazyModulo2SortedArrayPriorityQueueSpec
     pq.iterator.hasNext shouldBe false
   }
 
-  it should "allow adding elements during iteration" in {
+  it should "allow adding elements during iteration and finalize them correctly" in {
     val genArrays = Gen.listOf(Gen.listOf(Gen.choose(1, 1000)).map(_.sorted.reverse.toArray))
 
     forAll(genArrays) { initialArrays =>
@@ -67,12 +67,13 @@ class LazyModulo2SortedArrayPriorityQueueSpec
         allElements ++= arr
       }
 
-      val result = mutable.ArrayBuffer.empty[Int]
-
       while (pq.nonEmpty) {
         val next = pq.peek.get
 
-        // Randomly decide to add a new array that is <= next
+        // Randomly decide to add a new array that includes elements starting from 'next'
+
+        // This simulates the sparsification pattern where adding cofacets of a birth simplex
+        // includes the current death simplex (cancelling it out).
         if (scala.util.Random.nextDouble() < 0.2) {
           val numElements = scala.util.Random.nextInt(10)
           val newArr = Array.fill(numElements)(scala.util.Random.nextInt(next + 1)).sorted.reverse
@@ -81,7 +82,7 @@ class LazyModulo2SortedArrayPriorityQueueSpec
             allElements ++= newArr
           }
         } else {
-          result += pq.dequeue()
+          pq.dequeueToBuffer()
         }
       }
 
@@ -94,7 +95,7 @@ class LazyModulo2SortedArrayPriorityQueueSpec
         .sorted
         .reverse
 
-      result.toArray shouldBe expected
+      pq.drainToArray() shouldBe expected
     }
   }
 

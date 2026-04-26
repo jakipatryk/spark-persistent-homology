@@ -29,11 +29,16 @@ private[vr] class MutableCoboundaryMatrixColumn(
     queue += cofacets
   }
 
+  /** Dequeues the current pivot and adds it to an internal result buffer.
+    */
+  def dequeueToBuffer(): Unit = queue.dequeueToBuffer()
+
   def dequeue(): Simplex = queue.dequeue()
 
   def nonEmpty: Boolean = queue.nonEmpty
 
-  /** Converts this mutable column back to an immutable [[CoboundaryMatrixColumn]].
+  /** Converts this mutable column back to an immutable [[CoboundaryMatrixColumn]]. Drains the
+    * column.
     */
   def toImmutableAndDrain: CoboundaryMatrixColumn = {
     CoboundaryMatrixColumn(initialSimplex, queue.drainToArray())

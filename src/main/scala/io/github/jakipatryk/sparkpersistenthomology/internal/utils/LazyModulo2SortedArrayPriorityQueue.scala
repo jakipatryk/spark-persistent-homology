@@ -17,6 +17,7 @@ private[sparkpersistenthomology] class LazyModulo2SortedArrayPriorityQueue[T: Cl
 
   private var pq = mutable.PriorityQueue.empty[ArrayWrapper[T]](wrapperOrdering(ordering))
   private var nextElement: Option[T] = None
+  private val resultBuffer           = ArrayBuffer.empty[T]
 
   def +=(sortedArray: Array[T]): Unit = {
     if (sortedArray.nonEmpty) {
@@ -47,17 +48,26 @@ private[sparkpersistenthomology] class LazyModulo2SortedArrayPriorityQueue[T: Cl
     res
   }
 
+  /** Dequeues the current pivot and adds it to an internal result buffer.
+    */
+  def dequeueToBuffer(): Unit = {
+    resultBuffer += dequeue()
+  }
+
   def isEmpty: Boolean = peek.isEmpty
 
   def nonEmpty: Boolean = peek.isDefined
 
-  /** Constructs a sorted Array with elements of the queue (modulo 2 adjusted). */
+  /** Constructs a sorted Array with elements of the queue (modulo 2 adjusted). It also includes any
+    * elements previously added to the internal result buffer via dequeueToBuffer.
+    */
   def drainToArray(): Array[T] = {
-    val result = ArrayBuffer.empty[T]
     while (nonEmpty) {
-      result += dequeue()
+      dequeueToBuffer()
     }
-    result.toArray
+    val res = resultBuffer.toArray
+    resultBuffer.clear()
+    res
   }
 
   /** An iterator for elements of the queue (modulo 2 adjusted).
@@ -66,17 +76,15 @@ private[sparkpersistenthomology] class LazyModulo2SortedArrayPriorityQueue[T: Cl
     * is not greater (in `ordering`) than the currently processed element.
     */
   def iterator: Iterator[T] = new Iterator[T] {
-
     override def hasNext: Boolean = LazyModulo2SortedArrayPriorityQueue.this.nonEmpty
-
-    override def next(): T = LazyModulo2SortedArrayPriorityQueue.this.dequeue()
-
+    override def next(): T        = LazyModulo2SortedArrayPriorityQueue.this.dequeue()
   }
 
   override def clone(): LazyModulo2SortedArrayPriorityQueue[T] = {
     val newQueue = new LazyModulo2SortedArrayPriorityQueue[T]()
     this.pq.foreach(w => newQueue.pq.enqueue(w.copy()))
     newQueue.nextElement = this.nextElement
+    newQueue.resultBuffer ++= this.resultBuffer
     newQueue
   }
 
