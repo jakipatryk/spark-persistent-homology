@@ -1,38 +1,42 @@
 package io.github.jakipatryk.sparkpersistenthomology.internal.vr
 
-import scala.collection.mutable.ArrayBuffer
+import io.github.jakipatryk.sparkpersistenthomology.internal.utils.LazyModulo2SortedArrayPriorityQueue
 
 /** A mutable version of [[CoboundaryMatrixColumn]] used for high-performance local reduction.
   */
 private[vr] class MutableCoboundaryMatrixColumn(
   val initialSimplex: Simplex,
-  private var value: Array[Simplex]
+  private val queue: LazyModulo2SortedArrayPriorityQueue[Simplex]
 )(implicit context: FiltrationContext) {
 
   /** Returns the pivot of the column.
     */
-  def pivot: Option[Simplex] = value.headOption
+  def pivot: Option[Simplex] = queue.peek
 
   /** Adds an immutable column to this mutable one.
     */
   def +=(other: CoboundaryMatrixColumn): Unit = {
-    value = CoboundaryMatrixColumn.addSimplexChains(value, other.value)
+    queue += other.value
   }
 
   /** Adds the coboundary of a single simplex to this column.
     */
   def +=(birthSimplex: Simplex): Unit = {
-    val otherTop = birthSimplex.getCofacets.toArray
-    scala.util.Sorting.quickSort(otherTop)(
+    val cofacets = birthSimplex.getCofacets.toArray
+    scala.util.Sorting.quickSort(cofacets)(
       CoboundaryMatrixColumn.reverseSimplexFiltrationOrdering.reverse
     )
-    value = CoboundaryMatrixColumn.addSimplexChains(value, otherTop)
+    queue += cofacets
   }
+
+  def dequeue(): Simplex = queue.dequeue()
+
+  def nonEmpty: Boolean = queue.nonEmpty
 
   /** Converts this mutable column back to an immutable [[CoboundaryMatrixColumn]].
     */
   def toImmutableAndDrain: CoboundaryMatrixColumn = {
-    CoboundaryMatrixColumn(initialSimplex, value)
+    CoboundaryMatrixColumn(initialSimplex, queue.drainToArray())
   }
 
 }
@@ -42,10 +46,12 @@ private[vr] object MutableCoboundaryMatrixColumn {
   def apply(
     col: CoboundaryMatrixColumn
   )(implicit context: FiltrationContext): MutableCoboundaryMatrixColumn = {
-    new MutableCoboundaryMatrixColumn(
-      col.initialSimplex,
-      col.value
+    val queue = new LazyModulo2SortedArrayPriorityQueue[Simplex]()(
+      scala.reflect.classTag[Simplex],
+      CoboundaryMatrixColumn.reverseSimplexFiltrationOrdering
     )
+    queue += col.value
+    new MutableCoboundaryMatrixColumn(col.initialSimplex, queue)
   }
 
 }
