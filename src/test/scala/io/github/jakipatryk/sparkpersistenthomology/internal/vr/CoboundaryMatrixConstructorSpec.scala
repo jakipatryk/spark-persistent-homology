@@ -22,7 +22,7 @@ class CoboundaryMatrixConstructorSpec extends AnyFlatSpec with SharedSparkContex
     val distanceCalculator = DistanceCalculator.EuclideanDistanceCalculator
     val distanceThreshold  = 2.0f
 
-    val cns                  = CombinatorialNumberSystem(3, 3)
+    val cns                  = CombinatorialNumberSystem(3, 4)
     val broadcastCns         = sparkContext.broadcast(cns)
     val broadcastPointsCloud = sparkContext.broadcast(pointsCloud)
 
@@ -56,9 +56,8 @@ class CoboundaryMatrixConstructorSpec extends AnyFlatSpec with SharedSparkContex
     // Indices 0, 1, 2 are possible. 1 should be filtered out (clearing optimization)
     // Index 2 is in apparent pair with triangle 0.
     // Index 0 edge {1,0} has triangle {2,1,0} as cofacet. Triangle 0 is death of apparent pair with edge 2.
-    // Edge 0 is NOT part of apparent pair, but its ONLY cofacet (triangle 0) is death of an apparent pair.
-    // So edge 0's column becomes empty after sparsification and is filtered out.
-    assert(!indices.contains(0L))
+    // Index 0's column is no longer filtered in the constructor because it contains birth of an apparent pair cofacet.
+    assert(indices.contains(0L))
     assert(!indices.contains(1L))
     assert(!indices.contains(2L))
   }
@@ -74,7 +73,7 @@ class CoboundaryMatrixConstructorSpec extends AnyFlatSpec with SharedSparkContex
     val distanceCalculator = DistanceCalculator.EuclideanDistanceCalculator
     val distanceThreshold  = 2.0f
 
-    val cns                  = CombinatorialNumberSystem(3, 3)
+    val cns                  = CombinatorialNumberSystem(3, 4)
     val broadcastCns         = sparkContext.broadcast(cns)
     val broadcastPointsCloud = sparkContext.broadcast(pointsCloud)
 
@@ -93,13 +92,10 @@ class CoboundaryMatrixConstructorSpec extends AnyFlatSpec with SharedSparkContex
     val result = CoboundaryMatrixConstructor.construct(1, accumulator, None)
 
     val indices = result.map(_.initialSimplex.index).collect().toSet
-    // Index 0 edge {1,0} -> cofacet triangle 0. Triangle 0 is death of apparent pair with edge 2.
-    // Edge 0's column becomes empty.
-    // Index 1 edge {2,0} -> cofacet triangle 0. Triangle 0 is death of apparent pair with edge 2.
-    // Edge 1's column becomes empty.
-    // Index 2 is in apparent pair itself.
-    assert(!indices.contains(0L))
-    assert(!indices.contains(1L))
+    // Index 0 and 1 are no longer filtered out in the constructor.
+    // Index 2 is birth of apparent pair.
+    assert(indices.contains(0L))
+    assert(indices.contains(1L))
     assert(!indices.contains(2L))
   }
 
@@ -115,7 +111,7 @@ class CoboundaryMatrixConstructorSpec extends AnyFlatSpec with SharedSparkContex
     val distanceCalculator = DistanceCalculator.EuclideanDistanceCalculator
     val distanceThreshold  = 20.0f
 
-    val cns                  = CombinatorialNumberSystem(4, 3)
+    val cns                  = CombinatorialNumberSystem(4, 4)
     val broadcastCns         = sparkContext.broadcast(cns)
     val broadcastPointsCloud = sparkContext.broadcast(pointsCloud)
 
@@ -139,8 +135,8 @@ class CoboundaryMatrixConstructorSpec extends AnyFlatSpec with SharedSparkContex
     val numColumns = result.count()
 
     assert(totalCount == numColumns)
-    assert(numColumns == 0)
-    assert(stats.chunks(0).count == 0)
+    assert(numColumns == 3)
+    assert(stats.chunks.map(_.count).sum == 3)
 
   }
 

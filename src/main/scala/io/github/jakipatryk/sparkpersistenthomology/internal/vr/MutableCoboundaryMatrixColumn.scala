@@ -21,8 +21,10 @@ private[vr] class MutableCoboundaryMatrixColumn(
 
   /** Adds the coboundary of a single simplex to this column.
     */
-  def +=(birthSimplex: Simplex): Unit = {
-    val cofacets = birthSimplex.getCofacets.toArray
+  def +=(birthSimplex: Simplex)(implicit context: FiltrationContext): Unit = {
+    val cofacets = birthSimplex.getCofacets
+      .filterNot(ApparentPairsDetector.isBirthOfApparentPair)
+      .toArray
     scala.util.Sorting.quickSort(cofacets)(
       CoboundaryMatrixColumn.simplexFiltrationOrdering
     )

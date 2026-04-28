@@ -23,7 +23,7 @@ private[sparkpersistenthomology] object VietorisRipsPersistentCohomology {
       return Array.fill(maxDim + 1)(spark.emptyDataset[PersistencePair])
     }
 
-    val maxCombinationSize = Simplex.dimToCombinationSize(maxDim.toByte) + 1
+    val maxCombinationSize = Simplex.dimToCombinationSize(maxDim.toByte) + 2
     val cns                = new CombinatorialNumberSystem(numPoints, maxCombinationSize)
     val cnsBroadcast       = spark.sparkContext.broadcast(cns)
     val pointsBroadcast    = spark.sparkContext.broadcast(pointsArr)

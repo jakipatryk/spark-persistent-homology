@@ -84,13 +84,26 @@ object CoboundaryMatrixReducer {
     val pivotMap = LongMap.empty[CoboundaryMatrixColumn]
 
     val reducedIterator = partition.map { col =>
-      val mutableCol = MutableCoboundaryMatrixColumn(col)
-      var pOpt       = mutableCol.pivot
+      val mutableCol           = MutableCoboundaryMatrixColumn(col)
+      var pOpt                 = mutableCol.pivot
+      var foundDefinitivePivot = false
 
-      while (pOpt.isDefined && pivotMap.contains(pOpt.get.index)) {
-        stats.hasPivotChanged = true
-        mutableCol += pivotMap(pOpt.get.index)
-        pOpt = mutableCol.pivot
+      while (pOpt.isDefined && !foundDefinitivePivot) {
+        val currentPivot = pOpt.get
+        if (pivotMap.contains(currentPivot.index)) {
+          stats.hasPivotChanged = true
+          mutableCol += pivotMap(currentPivot.index)
+          pOpt = mutableCol.pivot
+        } else {
+          ApparentPairsDetector.getBirthIfIsDeathOfApparentPair(currentPivot) match {
+            case Some(birthSimplex) =>
+              stats.hasPivotChanged = true
+              mutableCol += birthSimplex
+              pOpt = mutableCol.pivot
+            case None =>
+              foundDefinitivePivot = true
+          }
+        }
       }
 
       val definitivePivot = pOpt
@@ -100,11 +113,15 @@ object CoboundaryMatrixReducer {
 
       while (mutableCol.nonEmpty) {
         val currentElement = mutableCol.pivot.get
-        pivotMap.get(currentElement.index) match {
-          case Some(prevCol) =>
-            mutableCol += prevCol
-          case None =>
-            mutableCol.dequeueToBuffer()
+        if (pivotMap.contains(currentElement.index)) {
+          mutableCol += pivotMap(currentElement.index)
+        } else {
+          ApparentPairsDetector.getBirthIfIsDeathOfApparentPair(currentElement) match {
+            case Some(birthSimplex) =>
+              mutableCol += birthSimplex
+            case None =>
+              mutableCol.dequeueToBuffer()
+          }
         }
       }
 

@@ -18,7 +18,7 @@ class CoboundaryMatrixColumnSpec extends AnyFlatSpec with SharedSparkContext {
       Array(1.0f, 1.0f),
       Array(10.0f, 10.0f)
     )
-    val cns              = CombinatorialNumberSystem(5, 3)
+    val cns              = CombinatorialNumberSystem(5, 5)
     val simplexDim: Byte = 1
 
     implicit val context: FiltrationContext =
@@ -35,9 +35,7 @@ class CoboundaryMatrixColumnSpec extends AnyFlatSpec with SharedSparkContext {
     assert(column.initialSimplex === initialSimplex)
 
     val expectedValue = Array(
-      Simplex(1, 2, 1.4142135f),
-      Simplex(0, 2, 1.4142135f),
-      Simplex(4, 2, 14.142136f)
+      Simplex(1, 2, 1.4142135f)
     )
     assert(column.value === expectedValue)
   }

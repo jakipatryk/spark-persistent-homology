@@ -34,19 +34,19 @@ private[sparkpersistenthomology] object ApparentPairsDetector extends Serializab
     }
   }
 
-  private def isDeathOfApparentPair(
-    simplex: Simplex
-  )(implicit context: FiltrationContext): Boolean = {
-    getBirthIfIsDeathOfApparentPair(simplex).isDefined
-  }
-
-  private def isBirthOfApparentPair(
+  def isBirthOfApparentPair(
     simplex: Simplex
   )(implicit context: FiltrationContext): Boolean = {
     simplex.getFirstCofacetWithSameRadius
       .flatMap(cofacet => cofacet.getFirstFacetWithSameRadius)
       .map(_.index == simplex.index)
       .getOrElse(false)
+  }
+
+  private[sparkpersistenthomology] def isDeathOfApparentPair(
+    simplex: Simplex
+  )(implicit context: FiltrationContext): Boolean = {
+    getBirthIfIsDeathOfApparentPair(simplex).isDefined
   }
 
 }

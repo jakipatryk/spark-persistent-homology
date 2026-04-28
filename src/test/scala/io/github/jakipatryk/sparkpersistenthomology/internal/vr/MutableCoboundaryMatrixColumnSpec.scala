@@ -19,7 +19,7 @@ class MutableCoboundaryMatrixColumnSpec extends AnyFlatSpec with SharedSparkCont
       Array(1.0f, 1.0f),
       Array(10.0f, 10.0f)
     )
-    val cns              = CombinatorialNumberSystem(5, 3)
+    val cns              = CombinatorialNumberSystem(5, 5)
     val simplexDim: Byte = 1 // combination size 2
 
     implicit val context: FiltrationContext =
@@ -37,9 +37,7 @@ class MutableCoboundaryMatrixColumnSpec extends AnyFlatSpec with SharedSparkCont
     val resolved = mutable.toImmutableAndDrain.value
 
     val expectedChain = List(
-      Simplex(1L, 2.toByte, 1.4142135f),
-      Simplex(0L, 2.toByte, 1.4142135f),
-      Simplex(4L, 2.toByte, 14.142136f)
+      Simplex(1L, 2.toByte, 1.4142135f)
     )
 
     assert(resolved.toList === expectedChain)
@@ -50,7 +48,7 @@ class MutableCoboundaryMatrixColumnSpec extends AnyFlatSpec with SharedSparkCont
   it should "add two columns correctly using full values" in {
     val distanceCalculator = DistanceCalculator.EuclideanDistanceCalculator
     val pointsCloud        = Array.tabulate(10)(i => Array(i.toFloat, 0.0f))
-    val cns                = CombinatorialNumberSystem(10, 3)
+    val cns                = CombinatorialNumberSystem(10, 5)
     val simplexDim: Byte   = 1
 
     implicit val context: FiltrationContext =
@@ -74,20 +72,7 @@ class MutableCoboundaryMatrixColumnSpec extends AnyFlatSpec with SharedSparkCont
     assert(result.initialSimplex === initial1)
 
     val expectedTopEntries = Array(
-      Simplex(2L, 2.toByte, 3.0f),
-      Simplex(1L, 2.toByte, 3.0f),
-      Simplex(5L, 2.toByte, 4.0f),
-      Simplex(4L, 2.toByte, 4.0f),
-      Simplex(11L, 2.toByte, 5.0f),
-      Simplex(10L, 2.toByte, 5.0f),
-      Simplex(21L, 2.toByte, 6.0f),
-      Simplex(20L, 2.toByte, 6.0f),
-      Simplex(36L, 2.toByte, 7.0f),
-      Simplex(35L, 2.toByte, 7.0f),
-      Simplex(57L, 2.toByte, 8.0f),
-      Simplex(56L, 2.toByte, 8.0f),
-      Simplex(85L, 2.toByte, 9.0f),
-      Simplex(84L, 2.toByte, 9.0f)
+      Simplex(2L, 2.toByte, 3.0f)
     )
 
     assert(result.value.toSeq === expectedTopEntries.toSeq)
@@ -101,7 +86,7 @@ class MutableCoboundaryMatrixColumnSpec extends AnyFlatSpec with SharedSparkCont
       Array(0.0f, 1.0f),
       Array(1.0f, 1.0f)
     )
-    val cns              = CombinatorialNumberSystem(4, 3)
+    val cns              = CombinatorialNumberSystem(4, 4)
     val simplexDim: Byte = 1
 
     implicit val context: FiltrationContext =

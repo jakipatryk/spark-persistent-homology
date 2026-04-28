@@ -52,42 +52,11 @@ private[sparkpersistenthomology] object CoboundaryMatrixColumn {
   def apply(
     initialSimplex: Simplex
   )(implicit context: FiltrationContext): CoboundaryMatrixColumn = {
-    val fullEntries = initialSimplex.getCofacets.toArray
+    val fullEntries = initialSimplex.getCofacets
+      .filterNot(ApparentPairsDetector.isBirthOfApparentPair)
+      .toArray
     scala.util.Sorting.quickSort(fullEntries)(simplexFiltrationOrdering)
     CoboundaryMatrixColumn(initialSimplex, fullEntries)
-  }
-
-  /** Merges two arrays of Simplices, sorted by `simplexOrdering` descending, modulo 2. */
-  private[vr] def addSimplexChains(
-    a: Array[Simplex],
-    b: Array[Simplex]
-  ): Array[Simplex] = {
-    val result = ArrayBuffer[Simplex]()
-    var i      = 0
-    var j      = 0
-    while (i < a.length && j < b.length) {
-      val cmp = reverseSimplexFiltrationOrdering.compare(a(i), b(j))
-      if (cmp > 0) {
-        result += a(i)
-        i += 1
-      } else if (cmp < 0) {
-        result += b(j)
-        j += 1
-      } else {
-        // modulo 2, they cancel out
-        i += 1
-        j += 1
-      }
-    }
-    while (i < a.length) {
-      result += a(i)
-      i += 1
-    }
-    while (j < b.length) {
-      result += b(j)
-      j += 1
-    }
-    result.toArray
   }
 
 }

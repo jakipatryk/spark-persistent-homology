@@ -19,7 +19,7 @@ class SimplexSpec extends AnyFlatSpec with SharedSparkContext {
     val distanceCalculator = DistanceCalculator.EuclideanDistanceCalculator
 
     // We have 4 points. max combination size up to 3
-    val cns              = CombinatorialNumberSystem(4, 3)
+    val cns              = CombinatorialNumberSystem(4, 5)
     val simplexDim: Byte = 2 // max combination size is 3
 
     implicit val context =
@@ -61,7 +61,7 @@ class SimplexSpec extends AnyFlatSpec with SharedSparkContext {
       Array(1.0f, 1.0f),
       Array(10.0f, 10.0f)
     )
-    val cns              = CombinatorialNumberSystem(5, 3)
+    val cns              = CombinatorialNumberSystem(5, 5)
     val simplexDim: Byte = 1 // combination size 2
 
     implicit val context =
@@ -102,7 +102,7 @@ class SimplexSpec extends AnyFlatSpec with SharedSparkContext {
       Array(1.0f, 1.0f),
       Array(10.0f, 10.0f)
     )
-    val cns              = CombinatorialNumberSystem(5, 3)
+    val cns              = CombinatorialNumberSystem(5, 5)
     val simplexDim: Byte = 1 // combination size 2
 
     // Set threshold to 5.0f, which is smaller than the distance to point 4 (~14.14f)
@@ -136,7 +136,7 @@ class SimplexSpec extends AnyFlatSpec with SharedSparkContext {
       Array(0.0f, 4.0f)
     )
     val distanceCalculator = DistanceCalculator.EuclideanDistanceCalculator
-    val cns                = CombinatorialNumberSystem(3, 3)
+    val cns                = CombinatorialNumberSystem(3, 5)
 
     implicit val context =
       FiltrationContext(

@@ -32,7 +32,7 @@ class CoboundaryMatrixReducerSpec
       val distanceCalculator = DistanceCalculator.EuclideanDistanceCalculator
 
       val numPoints = pointsCloud.length
-      val cns       = CombinatorialNumberSystem(numPoints, dim + 2)
+      val cns       = CombinatorialNumberSystem(numPoints, dim + 3)
 
       implicit val context: FiltrationContext = FiltrationContext(
         sparkContext.broadcast(cns),

@@ -29,7 +29,7 @@ class ApparentPairsDetectorSpec extends AnyFlatSpec with SharedSparkContext {
     val distanceCalculator = DistanceCalculator.EuclideanDistanceCalculator
     val distanceThreshold  = 2.0f
 
-    val cns                  = CombinatorialNumberSystem(3, 3)
+    val cns                  = CombinatorialNumberSystem(3, 4)
     val broadcastCns         = sparkContext.broadcast(cns)
     val broadcastPointsCloud = sparkContext.broadcast(pointsCloud)
 
@@ -83,7 +83,7 @@ class ApparentPairsDetectorSpec extends AnyFlatSpec with SharedSparkContext {
     val distanceCalculator = DistanceCalculator.EuclideanDistanceCalculator
     val distanceThreshold  = 5.0f
 
-    val cns                  = CombinatorialNumberSystem(4, 3)
+    val cns                  = CombinatorialNumberSystem(4, 4)
     val broadcastCns         = sparkContext.broadcast(cns)
     val broadcastPointsCloud = sparkContext.broadcast(pointsCloud)
 

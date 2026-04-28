@@ -42,20 +42,7 @@ private[sparkpersistenthomology] object CoboundaryMatrixConstructor {
           !ApparentPairsDetector.isInZeroApparentPair(simplex)
 
         if (shouldKeepTheSimplex) {
-          val initialColumn = CoboundaryMatrixColumn(simplex)
-          val mutableCol    = MutableCoboundaryMatrixColumn(initialColumn)
-
-          while (mutableCol.nonEmpty) {
-            val s = mutableCol.pivot.get
-            ApparentPairsDetector.getBirthIfIsDeathOfApparentPair(s) match {
-              case Some(birthSimplex) =>
-                mutableCol += birthSimplex
-              case None =>
-                mutableCol.dequeueToBuffer()
-            }
-          }
-
-          val result = mutableCol.toImmutableAndDrain
+          val result = CoboundaryMatrixColumn(simplex)
 
           if (result.value.nonEmpty) {
             result.pivot.map(_.index).foreach(localStats.addPivot)
