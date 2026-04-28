@@ -237,6 +237,65 @@ private[sparkpersistenthomology] class CombinatorialNumberSystem(
     }
   }
 
+  /** Returns an iterator with all supcombinations (of length of input combination +1) of a given
+    * combination, restricted to elements in `validElements` (must be sorted descending).
+    */
+  def supcombinationsIndicesIterator(
+    combination: Combination,
+    validElements: Array[Int]
+  ): Iterator[(Index, Int)] = {
+    val n = combination.length
+
+    new Iterator[(Index, Int)] {
+      private var validElementsIndex = 0
+      private var combinationIndex   = 0
+      private var nextAddedElement   = -1
+
+      private def advance(): Unit = {
+        nextAddedElement = -1
+        while (validElementsIndex < validElements.length && nextAddedElement == -1) {
+          val candidate = validElements(validElementsIndex)
+
+          while (combinationIndex < n && combination(combinationIndex) > candidate) {
+            combinationIndex += 1
+          }
+
+          if (combinationIndex < n && combination(combinationIndex) == candidate) {
+            validElementsIndex += 1
+            combinationIndex += 1
+          } else {
+            nextAddedElement = candidate
+            validElementsIndex += 1
+          }
+        }
+      }
+
+      advance()
+
+      override def hasNext: Boolean = nextAddedElement >= 0
+
+      override def next(): (Index, Int) = {
+        val addedElement = nextAddedElement
+
+        var index = 0L
+        var i     = 0
+        while (i < combinationIndex) {
+          index += combinationsLookup(combination(i), n + 1 - i)
+          i += 1
+        }
+        index += combinationsLookup(addedElement, n + 1 - combinationIndex)
+        i = combinationIndex
+        while (i < n) {
+          index += combinationsLookup(combination(i), n - i)
+          i += 1
+        }
+
+        advance()
+        (index, addedElement)
+      }
+    }
+  }
+
 }
 
 private[sparkpersistenthomology] object CombinatorialNumberSystem {

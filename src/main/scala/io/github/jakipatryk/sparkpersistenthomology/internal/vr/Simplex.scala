@@ -42,7 +42,9 @@ private[sparkpersistenthomology] case class Simplex(index: Long, dim: Byte, radi
     val simplexCombination =
       context.cns.value.getCombinationFromIndex(index, simplexCombinationSize)
 
-    val it = context.cns.value.supcombinationsIndicesIterator(simplexCombination)
+    val firstVertex   = simplexCombination(0)
+    val validElements = context.distanceMatrix.value.neighbors(firstVertex)
+    val it = context.cns.value.supcombinationsIndicesIterator(simplexCombination, validElements)
 
     new Iterator[Simplex] {
       private var nextSimplex: Simplex = null
@@ -51,7 +53,11 @@ private[sparkpersistenthomology] case class Simplex(index: Long, dim: Byte, radi
         while (nextSimplex == null && it.hasNext) {
           val (cofacetIndex, addedElement) = it.next()
           val maxDistanceToAddedPoint =
-            computeMaxDistanceFromPoint(addedElement, simplexCombination)
+            computeMaxDistanceFromPointWithThreshold(
+              addedElement,
+              simplexCombination,
+              context.distanceThreshold
+            )
           val cofacetRadius = math.max(radius, maxDistanceToAddedPoint)
 
           if (cofacetRadius <= context.distanceThreshold) {
@@ -99,13 +105,16 @@ private[sparkpersistenthomology] case class Simplex(index: Long, dim: Byte, radi
     val simplexCombination =
       context.cns.value.getCombinationFromIndex(index, simplexCombinationSize)
 
-    val it = context.cns.value.supcombinationsIndicesIterator(simplexCombination)
+    val firstVertex   = simplexCombination(0)
+    val validElements = context.distanceMatrix.value.neighbors(firstVertex)
+    val it = context.cns.value.supcombinationsIndicesIterator(simplexCombination, validElements)
     var result: Option[Simplex] = None
 
     while (it.hasNext && result.isEmpty) {
       val (cofacetIndex, addedElement) = it.next()
-      val maxDistanceToAddedPoint = computeMaxDistanceFromPoint(addedElement, simplexCombination)
-      val cofacetRadius           = math.max(radius, maxDistanceToAddedPoint)
+      val maxDistanceToAddedPoint =
+        computeMaxDistanceFromPointWithThreshold(addedElement, simplexCombination, radius)
+      val cofacetRadius = math.max(radius, maxDistanceToAddedPoint)
 
       if (cofacetRadius <= context.distanceThreshold && cofacetRadius == radius) {
         result = Some(Simplex(cofacetIndex, (dim + 1).toByte, cofacetRadius))
@@ -131,6 +140,26 @@ private[sparkpersistenthomology] object Simplex {
 
   @inline def combinationSizeToDim(combinationSize: Int): Byte = (combinationSize - 1).toByte
 
+  @inline private def getDistance(u: Int, v: Int)(implicit context: FiltrationContext): Float = {
+    if (u == v) return 0.0f
+    val neighbors = context.distanceMatrix.value.neighbors(u)
+    val distances = context.distanceMatrix.value.distances(u)
+    var low       = 0
+    var high      = neighbors.length - 1
+    while (low <= high) {
+      val mid    = (low + high) >>> 1
+      val midVal = neighbors(mid)
+      if (midVal < v) {
+        high = mid - 1
+      } else if (midVal > v) {
+        low = mid + 1
+      } else {
+        return distances(mid)
+      }
+    }
+    Float.PositiveInfinity
+  }
+
   private[sparkpersistenthomology] def computeCombinationRadiusExcept(
     combination: Array[Int],
     skipIndex: Int
@@ -142,10 +171,7 @@ private[sparkpersistenthomology] object Simplex {
         var v = u + 1
         while (v < combination.length) {
           if (v != skipIndex) {
-            val dist = context.distanceCalculator.calculateDistance(
-              context.pointsCloud.value(combination(u)),
-              context.pointsCloud.value(combination(v))
-            )
+            val dist = getDistance(combination(u), combination(v))
             if (dist > maxDistance) {
               maxDistance = dist
             }
@@ -166,10 +192,7 @@ private[sparkpersistenthomology] object Simplex {
     while (u < combination.length) {
       var v = u + 1
       while (v < combination.length) {
-        val dist = context.distanceCalculator.calculateDistance(
-          context.pointsCloud.value(combination(u)),
-          context.pointsCloud.value(combination(v))
-        )
+        val dist = getDistance(combination(u), combination(v))
         if (dist > maxDistance) {
           maxDistance = dist
         }
@@ -180,17 +203,18 @@ private[sparkpersistenthomology] object Simplex {
     maxDistance
   }
 
-  private[sparkpersistenthomology] def computeMaxDistanceFromPoint(
+  private[sparkpersistenthomology] def computeMaxDistanceFromPointWithThreshold(
     pointIndex: Int,
-    combination: Array[Int]
+    combination: Array[Int],
+    threshold: Float
   )(implicit context: FiltrationContext): Float = {
     var maxDistanceToPoint = 0.0f
     var i                  = 0
     while (i < combination.length) {
-      val dist = context.distanceCalculator.calculateDistance(
-        context.pointsCloud.value(pointIndex),
-        context.pointsCloud.value(combination(i))
-      )
+      val dist = getDistance(pointIndex, combination(i))
+      if (dist > threshold) {
+        return Float.PositiveInfinity
+      }
       if (dist > maxDistanceToPoint) {
         maxDistanceToPoint = dist
       }
