@@ -4,7 +4,6 @@ import org.scalatest.flatspec.AnyFlatSpec
 import io.github.jakipatryk.sparkpersistenthomology.SharedSparkContext
 import io.github.jakipatryk.sparkpersistenthomology.distances.DistanceCalculator
 import io.github.jakipatryk.sparkpersistenthomology.internal.utils.CombinatorialNumberSystem
-import io.github.jakipatryk.sparkpersistenthomology.internal.vr.PivotChunksStatisticsAccumulator.LocalPivotChunksStatistics
 import org.apache.spark.sql.Dataset
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 import org.scalacheck.Gen
@@ -43,20 +42,11 @@ class CoboundaryMatrixReducerSpec
 
       val numSimplicesNextDim =
         cns.allCombinationsCount(Simplex.dimToCombinationSize((dim + 1).toByte))
-      val accumulator =
-        new PivotChunksStatisticsAccumulator(
-          new LocalPivotChunksStatistics(10L, numSimplicesNextDim)
-        )
-      sparkContext.register(accumulator)
 
       // Generate unreduced matrix for dimension `dim`
-      val unreducedMatrix = CoboundaryMatrixConstructor.construct(dim.toByte, accumulator, None)
+      val unreducedMatrix = CoboundaryMatrixConstructor.construct(dim.toByte, None)
 
-      // Force evaluation and accumulator update before reduction,
-      // just like it happens in the real pipeline.
-      unreducedMatrix.count()
-
-      val reducedMatrix = CoboundaryMatrixReducer.reduce(unreducedMatrix, accumulator)
+      val reducedMatrix = CoboundaryMatrixReducer.reduce(unreducedMatrix)
       val results       = reducedMatrix.collect()
       val pivots        = results.flatMap(_.pivot)
 

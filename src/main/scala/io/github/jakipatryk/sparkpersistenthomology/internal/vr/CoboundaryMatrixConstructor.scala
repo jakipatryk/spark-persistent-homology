@@ -1,8 +1,6 @@
 package io.github.jakipatryk.sparkpersistenthomology.internal.vr
 
-import org.apache.spark.TaskContext
 import org.apache.spark.sql.{ Dataset, SparkSession }
-import io.github.jakipatryk.sparkpersistenthomology.internal.vr.PivotChunksStatisticsAccumulator.LocalPivotChunksStatistics
 
 private[sparkpersistenthomology] object CoboundaryMatrixConstructor {
 
@@ -16,13 +14,11 @@ private[sparkpersistenthomology] object CoboundaryMatrixConstructor {
     */
   def construct(
     dim: Byte,
-    pivotStatsAccumulator: PivotChunksStatisticsAccumulator,
     previousDimResult: Option[Dataset[CoboundaryMatrixColumn]] = None
   )(implicit context: FiltrationContext, spark: SparkSession): Dataset[CoboundaryMatrixColumn] = {
     import spark.implicits._
 
-    val numCombinations = context.cns.value.allCombinationsCount(Simplex.dimToCombinationSize(dim))
-    val range           = spark.range(numCombinations).as[Long]
+    val range = getValidIndicesForDim(dim)
 
     val filteredRange = previousDimResult match {
       case Some(prev) =>
@@ -32,10 +28,6 @@ private[sparkpersistenthomology] object CoboundaryMatrixConstructor {
     }
 
     filteredRange.as[Long].mapPartitions { iter =>
-      val localStats = pivotStatsAccumulator.createLocalStats()
-
-      TaskContext.get().addTaskCompletionListener[Unit](_ => pivotStatsAccumulator.add(localStats))
-
       iter.flatMap { index =>
         val simplex = Simplex(index, dim)
         val shouldKeepTheSimplex = simplex.radius <= context.distanceThreshold &&
@@ -45,7 +37,6 @@ private[sparkpersistenthomology] object CoboundaryMatrixConstructor {
           val result = CoboundaryMatrixColumn(simplex)
 
           if (result.value.nonEmpty) {
-            result.pivot.map(_.index).foreach(localStats.addPivot)
             Some(result)
           } else {
             None
@@ -54,6 +45,30 @@ private[sparkpersistenthomology] object CoboundaryMatrixConstructor {
           None
         }
       }
+    }
+  }
+
+  private def getValidIndicesForDim(
+    dim: Byte
+  )(implicit context: FiltrationContext, spark: SparkSession): Dataset[Long] = {
+    import spark.implicits._
+    val combinationSize = Simplex.dimToCombinationSize(dim)
+
+    if (dim == 0) {
+      val numCombinations = context.cns.value.allCombinationsCount(combinationSize)
+      spark.range(numCombinations).as[Long]
+    } else {
+      val numPoints = context.distanceMatrix.value.neighbors.length
+
+      spark.sparkContext
+        .parallelize(0 until numPoints)
+        .mapPartitions { iter =>
+          val cns            = context.cns.value
+          val distanceMatrix = context.distanceMatrix.value
+
+          iter.flatMap(v => new CliqueIterator(v, combinationSize, distanceMatrix, cns))
+        }
+        .toDS()
     }
   }
 

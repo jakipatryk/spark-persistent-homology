@@ -2,11 +2,11 @@ package io.github.jakipatryk.sparkpersistenthomology.internal.vr
 
 import org.apache.spark.sql.Dataset
 import org.apache.spark.sql.SparkSession
-import org.apache.spark.sql.functions.{ col, udf }
-import io.github.jakipatryk.sparkpersistenthomology.internal.vr.PivotChunksStatisticsAccumulator.LocalPivotChunksStatistics
+import org.apache.spark.sql.functions.col
 import scala.collection.mutable.LongMap
 
 import org.apache.spark.TaskContext
+import org.apache.spark.util.LongAccumulator
 
 object CoboundaryMatrixReducer {
 
@@ -16,27 +16,32 @@ object CoboundaryMatrixReducer {
     * persistence pair (`i`, inf).
     */
   def reduce(
-    coboundaryMatrix: Dataset[CoboundaryMatrixColumn],
-    pivotStatsAccumulator: PivotChunksStatisticsAccumulator
+    coboundaryMatrix: Dataset[CoboundaryMatrixColumn]
   )(implicit context: FiltrationContext, spark: SparkSession): Dataset[CoboundaryMatrixColumn] = {
     import spark.implicits._
 
     var currentMatrix          = coboundaryMatrix
     var shouldContinueReducing = true
 
-    while (shouldContinueReducing) {
-      val partitionedAndSortedMatrix = repartitionAndSort(
-        currentMatrix,
-        pivotStatsAccumulator
-      )
+    val numPartitions = spark.conf.get("spark.sql.shuffle.partitions").toInt
 
-      pivotStatsAccumulator.reset()
+    while (shouldContinueReducing) {
+      val hasPivotChangedAcc = spark.sparkContext.longAccumulator
+
+      val partitionedAndSortedMatrix = currentMatrix
+        .repartition(numPartitions, CoboundaryMatrixColumn.pivotExpression)
+        .sortWithinPartitions(
+          CoboundaryMatrixColumn.reverseColumnsFiltrationOrderingExpressions: _*
+        )
+        .as[CoboundaryMatrixColumn]
 
       val nextMatrix = partitionedAndSortedMatrix.mapPartitions { partition =>
-        val (reducedIterator, localStats) = reducePartition(partition, pivotStatsAccumulator)
+        val (reducedIterator, hasPivotChanged) = reducePartition(partition)
         TaskContext
           .get()
-          .addTaskCompletionListener[Unit](_ => pivotStatsAccumulator.add(localStats))
+          .addTaskCompletionListener[Unit] { _ =>
+            if (hasPivotChanged()) hasPivotChangedAcc.add(1L)
+          }
         reducedIterator
       }
 
@@ -46,42 +51,19 @@ object CoboundaryMatrixReducer {
         prevMatrix.unpersist(false)
       }
 
-      shouldContinueReducing = pivotStatsAccumulator.value.hasPivotChanged
+      shouldContinueReducing = !hasPivotChangedAcc.isZero
     }
 
     currentMatrix
   }
 
-  private def repartitionAndSort(
-    coboundaryMatrix: Dataset[CoboundaryMatrixColumn],
-    pivotStatsAccumulator: PivotChunksStatisticsAccumulator
-  )(implicit spark: SparkSession): Dataset[CoboundaryMatrixColumn] = {
-    import spark.implicits._
-
-    val stats         = pivotStatsAccumulator.value
-    val numPartitions = spark.conf.get("spark.sql.shuffle.partitions").toInt
-    val partitionIdExpr = PartitioningUtils.getPartitionId(
-      CoboundaryMatrixColumn.pivotExpression,
-      stats,
-      numPartitions
-    )
-
-    coboundaryMatrix
-      .withColumn("_partition_id", partitionIdExpr)
-      .repartition(numPartitions, col("_partition_id"))
-      .sortWithinPartitions(CoboundaryMatrixColumn.reverseColumnsFiltrationOrderingExpressions: _*)
-      .drop("_partition_id")
-      .as[CoboundaryMatrixColumn]
-  }
-
   private def reducePartition(
-    partition: Iterator[CoboundaryMatrixColumn],
-    pivotStatsAccumulator: PivotChunksStatisticsAccumulator
+    partition: Iterator[CoboundaryMatrixColumn]
   )(implicit
     context: FiltrationContext
-  ): (Iterator[CoboundaryMatrixColumn], LocalPivotChunksStatistics) = {
-    val stats    = pivotStatsAccumulator.createLocalStats()
-    val pivotMap = LongMap.empty[CoboundaryMatrixColumn]
+  ): (Iterator[CoboundaryMatrixColumn], () => Boolean) = {
+    val pivotMap        = LongMap.empty[CoboundaryMatrixColumn]
+    var hasPivotChanged = false
 
     val reducedIterator = partition.map { col =>
       val mutableCol           = MutableCoboundaryMatrixColumn(col)
@@ -91,13 +73,13 @@ object CoboundaryMatrixReducer {
       while (pOpt.isDefined && !foundDefinitivePivot) {
         val currentPivot = pOpt.get
         if (pivotMap.contains(currentPivot.index)) {
-          stats.hasPivotChanged = true
+          hasPivotChanged = true
           mutableCol += pivotMap(currentPivot.index)
           pOpt = mutableCol.pivot
         } else {
           ApparentPairsDetector.getBirthIfIsDeathOfApparentPair(currentPivot) match {
             case Some(birthSimplex) =>
-              stats.hasPivotChanged = true
+              hasPivotChanged = true
               mutableCol += birthSimplex
               pOpt = mutableCol.pivot
             case None =>
@@ -129,13 +111,12 @@ object CoboundaryMatrixReducer {
 
       definitivePivot.map(_.index).foreach { p =>
         pivotMap.put(p, result)
-        stats.addPivot(p)
       }
 
       result
     }
 
-    (reducedIterator, stats)
+    (reducedIterator, () => hasPivotChanged)
   }
 
 }

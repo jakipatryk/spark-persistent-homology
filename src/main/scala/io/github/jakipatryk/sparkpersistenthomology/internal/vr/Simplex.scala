@@ -42,8 +42,7 @@ private[sparkpersistenthomology] case class Simplex(index: Long, dim: Byte, radi
     val simplexCombination =
       context.cns.value.getCombinationFromIndex(index, simplexCombinationSize)
 
-    val firstVertex   = simplexCombination(0)
-    val validElements = context.distanceMatrix.value.neighbors(firstVertex)
+    val validElements = context.distanceMatrix.value.getCommonNeighbors(simplexCombination)
     val it = context.cns.value.supcombinationsIndicesIterator(simplexCombination, validElements)
 
     new Iterator[Simplex] {
@@ -105,8 +104,7 @@ private[sparkpersistenthomology] case class Simplex(index: Long, dim: Byte, radi
     val simplexCombination =
       context.cns.value.getCombinationFromIndex(index, simplexCombinationSize)
 
-    val firstVertex   = simplexCombination(0)
-    val validElements = context.distanceMatrix.value.neighbors(firstVertex)
+    val validElements = context.distanceMatrix.value.getCommonNeighbors(simplexCombination)
     val it = context.cns.value.supcombinationsIndicesIterator(simplexCombination, validElements)
     var result: Option[Simplex] = None
 

@@ -4,7 +4,6 @@ import org.scalatest.flatspec.AnyFlatSpec
 import io.github.jakipatryk.sparkpersistenthomology.SharedSparkContext
 import io.github.jakipatryk.sparkpersistenthomology.distances.DistanceCalculator
 import io.github.jakipatryk.sparkpersistenthomology.internal.utils.CombinatorialNumberSystem
-import io.github.jakipatryk.sparkpersistenthomology.internal.vr.PivotChunksStatisticsAccumulator.LocalPivotChunksStatistics
 import org.apache.spark.sql.Dataset
 
 class CoboundaryMatrixConstructorSpec extends AnyFlatSpec with SharedSparkContext {
@@ -46,11 +45,8 @@ class CoboundaryMatrixConstructorSpec extends AnyFlatSpec with SharedSparkContex
     val previousDimResult: Dataset[CoboundaryMatrixColumn] = spark.createDataset(Seq(colWithPivot1))
 
     val numSimplicesNextDim = cns.allCombinationsCount(Simplex.dimToCombinationSize(2)) // triangles
-    val accumulator =
-      new PivotChunksStatisticsAccumulator(new LocalPivotChunksStatistics(10L, numSimplicesNextDim))
-    sparkContext.register(accumulator)
 
-    val result = CoboundaryMatrixConstructor.construct(1, accumulator, Some(previousDimResult))
+    val result = CoboundaryMatrixConstructor.construct(1, Some(previousDimResult))
 
     val indices = result.map(_.initialSimplex.index).collect().toSet
     // Indices 0, 1, 2 are possible. 1 should be filtered out (clearing optimization)
@@ -85,11 +81,8 @@ class CoboundaryMatrixConstructorSpec extends AnyFlatSpec with SharedSparkContex
     )
 
     val numSimplicesNextDim = cns.allCombinationsCount(Simplex.dimToCombinationSize(2))
-    val accumulator =
-      new PivotChunksStatisticsAccumulator(new LocalPivotChunksStatistics(10L, numSimplicesNextDim))
-    sparkContext.register(accumulator)
 
-    val result = CoboundaryMatrixConstructor.construct(1, accumulator, None)
+    val result = CoboundaryMatrixConstructor.construct(1, None)
 
     val indices = result.map(_.initialSimplex.index).collect().toSet
     // Index 0 and 1 are no longer filtered out in the constructor.
@@ -97,47 +90,6 @@ class CoboundaryMatrixConstructorSpec extends AnyFlatSpec with SharedSparkContex
     assert(indices.contains(0L))
     assert(indices.contains(1L))
     assert(!indices.contains(2L))
-  }
-
-  it should "update the accumulator correctly" in {
-    import spark.implicits._
-
-    val pointsCloud = Array(
-      Array(0.0f, 0.0f),
-      Array(1.0f, 0.0f),
-      Array(0.0f, 1.0f),
-      Array(10.0f, 10.0f)
-    )
-    val distanceCalculator = DistanceCalculator.EuclideanDistanceCalculator
-    val distanceThreshold  = 20.0f
-
-    val cns                  = CombinatorialNumberSystem(4, 4)
-    val broadcastCns         = sparkContext.broadcast(cns)
-    val broadcastPointsCloud = sparkContext.broadcast(pointsCloud)
-
-    implicit val context: FiltrationContext = FiltrationContext(
-      broadcastCns,
-      broadcastPointsCloud,
-      distanceCalculator,
-      distanceThreshold
-    )
-
-    val numSimplicesNextDim = cns.allCombinationsCount(Simplex.dimToCombinationSize(2))
-    val accumulator =
-      new PivotChunksStatisticsAccumulator(new LocalPivotChunksStatistics(1L, numSimplicesNextDim))
-    sparkContext.register(accumulator)
-
-    val result = CoboundaryMatrixConstructor.construct(1, accumulator, None)
-    result.collect()
-
-    val stats      = accumulator.value
-    val totalCount = stats.chunks.map(_.count).sum
-    val numColumns = result.count()
-
-    assert(totalCount == numColumns)
-    assert(numColumns == 3)
-    assert(stats.chunks.map(_.count).sum == 3)
-
   }
 
 }

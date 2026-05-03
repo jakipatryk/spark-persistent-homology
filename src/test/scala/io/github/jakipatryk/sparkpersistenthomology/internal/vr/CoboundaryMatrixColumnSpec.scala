@@ -37,7 +37,8 @@ class CoboundaryMatrixColumnSpec extends AnyFlatSpec with SharedSparkContext {
     val expectedValue = Array(
       Simplex(1, 2, 1.4142135f)
     )
-    assert(column.value === expectedValue)
+    val sortedExpectedValue = expectedValue.sorted(CoboundaryMatrixColumn.simplexFiltrationOrdering)
+    assert(column.value === sortedExpectedValue)
   }
 
   behavior of "pivotExpression"

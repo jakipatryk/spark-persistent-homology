@@ -52,9 +52,8 @@ private[sparkpersistenthomology] object CoboundaryMatrixColumn {
   def apply(
     initialSimplex: Simplex
   )(implicit context: FiltrationContext): CoboundaryMatrixColumn = {
-    val fullEntries = initialSimplex.getCofacets
-      .filterNot(ApparentPairsDetector.isBirthOfApparentPair)
-      .toArray
+    val fullEntries =
+      initialSimplex.getCofacets.filterNot(ApparentPairsDetector.isBirthOfApparentPair).toArray
     scala.util.Sorting.quickSort(fullEntries)(simplexFiltrationOrdering)
     CoboundaryMatrixColumn(initialSimplex, fullEntries)
   }
