@@ -38,6 +38,8 @@ private[sparkpersistenthomology] object VietorisRipsPersistentCohomology {
       threshold
     )
 
+    pointsBroadcast.unpersist()
+
     var previousDimResult: Option[Dataset[CoboundaryMatrixColumn]] = None
     val results = new Array[Dataset[PersistencePair]](maxDim + 1)
 

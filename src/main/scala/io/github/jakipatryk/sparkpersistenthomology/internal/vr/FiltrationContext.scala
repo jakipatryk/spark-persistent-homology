@@ -22,7 +22,6 @@ import io.github.jakipatryk.sparkpersistenthomology.internal.utils.Combinatorial
   */
 private[sparkpersistenthomology] case class FiltrationContext(
   cns: Broadcast[CombinatorialNumberSystem],
-  pointsCloud: Broadcast[Array[Array[Float]]],
   distanceMatrix: Broadcast[SparseDistanceMatrix],
   distanceCalculator: DistanceCalculator,
   distanceThreshold: Float,
@@ -45,7 +44,6 @@ private[sparkpersistenthomology] object FiltrationContext {
 
     new FiltrationContext(
       cns,
-      pointsCloud,
       distanceMatrixBroadcast,
       distanceCalculator,
       distanceThreshold,
