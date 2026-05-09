@@ -1,6 +1,9 @@
 package io.github.jakipatryk.sparkpersistenthomology.internal.vr
 
-import io.github.jakipatryk.sparkpersistenthomology.internal.utils.CombinatorialNumberSystem
+import io.github.jakipatryk.sparkpersistenthomology.internal.utils.{
+  CombinatorialNumberSystem,
+  SimplexIndex
+}
 
 /** Iterator that finds all `combinationSize`-cliques (simplices) in a graph that contain a specific
   * vertex `startVertex`.
@@ -20,7 +23,7 @@ private[vr] class CliqueIterator(
   combinationSize: Int,
   distanceMatrix: SparseDistanceMatrix,
   combinatorialNumberSystem: CombinatorialNumberSystem
-) extends Iterator[Long] {
+) extends Iterator[BigInt] {
   private val degree               = distanceMatrix.neighbors(startVertex).length
   private val currentCombination   = new Array[Int](combinationSize)
   private val candidatesStack      = Array.fill(combinationSize)(new Array[Int](degree))
@@ -28,7 +31,7 @@ private[vr] class CliqueIterator(
   private val candidateIndexStack  = new Array[Int](combinationSize)
   private var depth                = 1
 
-  private var nextIndex: Long = -1L
+  private var nextIndex: BigInt = BigInt(-1)
 
   initializeSearchState(startVertex)
   if (combinationSize > 1) {
@@ -63,10 +66,10 @@ private[vr] class CliqueIterator(
   }
 
   private def advance(): Unit = {
-    nextIndex = -1L
+    nextIndex = BigInt(-1)
 
     // Iterative Depth-First Search
-    while (depth > 0 && nextIndex == -1L) {
+    while (depth > 0 && nextIndex == BigInt(-1)) {
       if (candidateIndexStack(depth) < candidatesCountStack(depth)) {
         val currentVertex = candidatesStack(depth)(candidateIndexStack(depth))
         currentCombination(depth) = currentVertex
@@ -118,15 +121,15 @@ private[vr] class CliqueIterator(
     }
   }
 
-  override def hasNext: Boolean = nextIndex != -1L
+  override def hasNext: Boolean = nextIndex != BigInt(-1)
 
-  override def next(): Long = {
+  override def next(): BigInt = {
     if (!hasNext) throw new java.util.NoSuchElementException()
     val res = nextIndex
     if (combinationSize > 1) {
       advance()
     } else {
-      nextIndex = -1L
+      nextIndex = BigInt(-1)
     }
     res
   }

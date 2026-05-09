@@ -1,5 +1,6 @@
 package io.github.jakipatryk.sparkpersistenthomology.internal.vr
 
+import io.github.jakipatryk.sparkpersistenthomology.internal.utils.SimplexIndex
 import org.apache.spark.sql.Dataset
 import org.apache.spark.sql.SparkSession
 import org.apache.spark.sql.functions.col
@@ -78,7 +79,7 @@ object CoboundaryMatrixReducer {
   )(implicit
     context: FiltrationContext
   ): (Iterator[CoboundaryMatrixColumn], () => Boolean) = {
-    val pivotMap        = LongMap.empty[CoboundaryMatrixColumn]
+    val pivotMap = scala.collection.mutable.HashMap.empty[SimplexIndex, CoboundaryMatrixColumn]
     var hasPivotChanged = false
 
     val reducedIterator = partition.map { col =>

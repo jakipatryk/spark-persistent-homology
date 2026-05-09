@@ -6,6 +6,8 @@ import io.github.jakipatryk.sparkpersistenthomology.distances.DistanceCalculator
 import io.github.jakipatryk.sparkpersistenthomology.internal.utils.CombinatorialNumberSystem
 import org.apache.spark.sql.Dataset
 
+import io.github.jakipatryk.sparkpersistenthomology.internal.utils.SimplexIndex
+
 class CoboundaryMatrixConstructorSpec extends AnyFlatSpec with SharedSparkContext {
 
   behavior of "construct"
@@ -39,8 +41,8 @@ class CoboundaryMatrixConstructorSpec extends AnyFlatSpec with SharedSparkContex
     // Mock previousDimResult (dim 0 results having pivot in dim 1)
     // Simplex(1, 1) has index 1, dim 1.
     val colWithPivot1 = CoboundaryMatrixColumn(
-      initialSimplex = Simplex(0, 0, 0.0f),
-      value = Array(Simplex(1, 1, 1.0f))
+      initialSimplex = Simplex(SimplexIndex(0, context.indexPadding), 0, 0.0f),
+      value = Array(Simplex(SimplexIndex(1, context.indexPadding), 1, 1.0f))
     )
     val previousDimResult: Dataset[CoboundaryMatrixColumn] = spark.createDataset(Seq(colWithPivot1))
 
@@ -53,9 +55,9 @@ class CoboundaryMatrixConstructorSpec extends AnyFlatSpec with SharedSparkContex
     // Index 2 is in apparent pair with triangle 0.
     // Index 0 edge {1,0} has triangle {2,1,0} as cofacet. Triangle 0 is death of apparent pair with edge 2.
     // Index 0's column is no longer filtered in the constructor because it contains birth of an apparent pair cofacet.
-    assert(indices.contains(0L))
-    assert(!indices.contains(1L))
-    assert(!indices.contains(2L))
+    assert(indices.contains(SimplexIndex(0, context.indexPadding)))
+    assert(!indices.contains(SimplexIndex(1, context.indexPadding)))
+    assert(!indices.contains(SimplexIndex(2, context.indexPadding)))
   }
 
   it should "work fine when there are no previous dim results" in {
@@ -87,9 +89,9 @@ class CoboundaryMatrixConstructorSpec extends AnyFlatSpec with SharedSparkContex
     val indices = result.map(_.initialSimplex.index).collect().toSet
     // Index 0 and 1 are no longer filtered out in the constructor.
     // Index 2 is birth of apparent pair.
-    assert(indices.contains(0L))
-    assert(indices.contains(1L))
-    assert(!indices.contains(2L))
+    assert(indices.contains(SimplexIndex(0, context.indexPadding)))
+    assert(indices.contains(SimplexIndex(1, context.indexPadding)))
+    assert(!indices.contains(SimplexIndex(2, context.indexPadding)))
   }
 
 }

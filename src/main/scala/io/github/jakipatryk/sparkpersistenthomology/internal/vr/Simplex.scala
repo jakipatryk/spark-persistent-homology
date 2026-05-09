@@ -1,6 +1,8 @@
 package io.github.jakipatryk.sparkpersistenthomology.internal.vr
 
-private[sparkpersistenthomology] case class Simplex(index: Long, dim: Byte, radius: Float) {
+import io.github.jakipatryk.sparkpersistenthomology.internal.utils.SimplexIndex
+
+private[sparkpersistenthomology] case class Simplex(index: SimplexIndex, dim: Byte, radius: Float) {
 
   import Simplex._
 
@@ -14,7 +16,7 @@ private[sparkpersistenthomology] case class Simplex(index: Long, dim: Byte, radi
   def getFacets(implicit context: FiltrationContext): Iterator[Simplex] = {
     val simplexCombinationSize = dimToCombinationSize(dim)
     val simplexCombination =
-      context.cns.value.getCombinationFromIndex(index, simplexCombinationSize)
+      context.cns.value.getCombinationFromIndex(index.toBigInt, simplexCombinationSize)
 
     val it = context.cns.value.subcombinationsIndicesIterator(simplexCombination)
 
@@ -24,7 +26,7 @@ private[sparkpersistenthomology] case class Simplex(index: Long, dim: Byte, radi
       override def next(): Simplex = {
         val (facetIndex, removedIndex, _) = it.next()
         val maxDistance = computeCombinationRadiusExcept(simplexCombination, removedIndex)
-        Simplex(facetIndex, (dim - 1).toByte, maxDistance)
+        Simplex(SimplexIndex(facetIndex, context.indexPadding), (dim - 1).toByte, maxDistance)
       }
     }
   }
@@ -40,7 +42,7 @@ private[sparkpersistenthomology] case class Simplex(index: Long, dim: Byte, radi
   def getCofacets(implicit context: FiltrationContext): Iterator[Simplex] = {
     val simplexCombinationSize = dimToCombinationSize(dim)
     val simplexCombination =
-      context.cns.value.getCombinationFromIndex(index, simplexCombinationSize)
+      context.cns.value.getCombinationFromIndex(index.toBigInt, simplexCombinationSize)
 
     val validElements = context.distanceMatrix.value.getCommonNeighbors(simplexCombination)
     val it = context.cns.value.supcombinationsIndicesIterator(simplexCombination, validElements)
@@ -60,7 +62,11 @@ private[sparkpersistenthomology] case class Simplex(index: Long, dim: Byte, radi
           val cofacetRadius = math.max(radius, maxDistanceToAddedPoint)
 
           if (cofacetRadius <= context.distanceThreshold) {
-            nextSimplex = Simplex(cofacetIndex, (dim + 1).toByte, cofacetRadius)
+            nextSimplex = Simplex(
+              SimplexIndex(cofacetIndex, context.indexPadding),
+              (dim + 1).toByte,
+              cofacetRadius
+            )
           }
         }
       }
@@ -82,7 +88,7 @@ private[sparkpersistenthomology] case class Simplex(index: Long, dim: Byte, radi
   def getFirstFacetWithSameRadius(implicit context: FiltrationContext): Option[Simplex] = {
     val simplexCombinationSize = dimToCombinationSize(dim)
     val simplexCombination =
-      context.cns.value.getCombinationFromIndex(index, simplexCombinationSize)
+      context.cns.value.getCombinationFromIndex(index.toBigInt, simplexCombinationSize)
 
     val it = context.cns.value.subcombinationsIndicesIterator(simplexCombination)
     var result: Option[Simplex] = None
@@ -92,7 +98,9 @@ private[sparkpersistenthomology] case class Simplex(index: Long, dim: Byte, radi
       val facetRadius = computeCombinationRadiusExcept(simplexCombination, removedIndex)
 
       if (facetRadius == radius) {
-        result = Some(Simplex(facetIndex, (dim - 1).toByte, facetRadius))
+        result = Some(
+          Simplex(SimplexIndex(facetIndex, context.indexPadding), (dim - 1).toByte, facetRadius)
+        )
       }
     }
 
@@ -102,7 +110,7 @@ private[sparkpersistenthomology] case class Simplex(index: Long, dim: Byte, radi
   def getFirstCofacetWithSameRadius(implicit context: FiltrationContext): Option[Simplex] = {
     val simplexCombinationSize = dimToCombinationSize(dim)
     val simplexCombination =
-      context.cns.value.getCombinationFromIndex(index, simplexCombinationSize)
+      context.cns.value.getCombinationFromIndex(index.toBigInt, simplexCombinationSize)
 
     val validElements = context.distanceMatrix.value.getCommonNeighbors(simplexCombination)
     val it = context.cns.value.supcombinationsIndicesIterator(simplexCombination, validElements)
@@ -115,7 +123,9 @@ private[sparkpersistenthomology] case class Simplex(index: Long, dim: Byte, radi
       val cofacetRadius = math.max(radius, maxDistanceToAddedPoint)
 
       if (cofacetRadius == radius) {
-        result = Some(Simplex(cofacetIndex, (dim + 1).toByte, cofacetRadius))
+        result = Some(
+          Simplex(SimplexIndex(cofacetIndex, context.indexPadding), (dim + 1).toByte, cofacetRadius)
+        )
       }
     }
 
@@ -126,12 +136,16 @@ private[sparkpersistenthomology] case class Simplex(index: Long, dim: Byte, radi
 
 private[sparkpersistenthomology] object Simplex {
 
-  def apply(index: Long, dim: Byte)(implicit context: FiltrationContext): Simplex = {
+  def apply(index: SimplexIndex, dim: Byte)(implicit context: FiltrationContext): Simplex = {
     val combinationSize = dimToCombinationSize(dim)
     val combination =
-      context.cns.value.getCombinationFromIndex(index, combinationSize)
+      context.cns.value.getCombinationFromIndex(index.toBigInt, combinationSize)
     val radius = computeCombinationRadius(combination)
     Simplex(index, dim, radius)
+  }
+
+  def apply(index: BigInt, dim: Byte)(implicit context: FiltrationContext): Simplex = {
+    apply(SimplexIndex(index, context.indexPadding), dim)
   }
 
   @inline def dimToCombinationSize(dim: Byte): Int = dim + 1

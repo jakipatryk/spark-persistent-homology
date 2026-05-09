@@ -28,7 +28,7 @@ private[sparkpersistenthomology] object CoboundaryMatrixColumn {
     override def compare(x: Simplex, y: Simplex): Int = {
       val radiusCmp = java.lang.Float.compare(y.radius, x.radius)
       if (radiusCmp != 0) radiusCmp
-      else java.lang.Long.compare(x.index, y.index)
+      else x.index.compare(y.index)
     }
   }
 
@@ -42,10 +42,7 @@ private[sparkpersistenthomology] object CoboundaryMatrixColumn {
   /** Returns a Catalyst expression to extract the pivot index directly from Tungsten binary format.
     */
   def pivotExpression: Column = {
-    coalesce(
-      expr("try_element_at(value, 1).index"), // 1-based indexing in Spark SQL
-      lit(-1L)
-    )
+    expr("coalesce(try_element_at(value, 1).index.value, '-1')")
   }
 
   /** Creates a new CoboundaryMatrixColumn from an initial simplex. */

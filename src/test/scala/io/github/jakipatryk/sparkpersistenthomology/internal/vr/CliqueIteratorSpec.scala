@@ -1,6 +1,9 @@
 package io.github.jakipatryk.sparkpersistenthomology.internal.vr
 
-import io.github.jakipatryk.sparkpersistenthomology.internal.utils.CombinatorialNumberSystem
+import io.github.jakipatryk.sparkpersistenthomology.internal.utils.{
+  CombinatorialNumberSystem,
+  SimplexIndex
+}
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
 

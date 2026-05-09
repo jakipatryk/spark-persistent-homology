@@ -3,7 +3,10 @@ package io.github.jakipatryk.sparkpersistenthomology.internal.vr
 import org.scalatest.flatspec.AnyFlatSpec
 import io.github.jakipatryk.sparkpersistenthomology.SharedSparkContext
 import io.github.jakipatryk.sparkpersistenthomology.distances.DistanceCalculator
-import io.github.jakipatryk.sparkpersistenthomology.internal.utils.CombinatorialNumberSystem
+import io.github.jakipatryk.sparkpersistenthomology.internal.utils.{
+  CombinatorialNumberSystem,
+  SimplexIndex
+}
 
 class SimplexSpec extends AnyFlatSpec with SharedSparkContext {
 
@@ -37,14 +40,15 @@ class SimplexSpec extends AnyFlatSpec with SharedSparkContext {
     // [3, 2] (index 5), max distance = 1.0f (removed 1)
     // They should be ordered by CNS index ascending, so [2, 1], [3, 1], then [3, 2]
 
-    val simplex  = Simplex(index = 3L, dim = simplexDim, radius = 1.4142135f)
+    val simplex =
+      Simplex(index = SimplexIndex(3L, context.indexPadding), dim = simplexDim, radius = 1.4142135f)
     val iterator = simplex.getFacets
 
     val facets = iterator.toList
     val expectedFacets = List(
-      Simplex(2L, 1.toByte, 1.4142135f),
-      Simplex(4L, 1.toByte, 1.0f),
-      Simplex(5L, 1.toByte, 1.0f)
+      Simplex(SimplexIndex(2L, context.indexPadding), 1.toByte, 1.4142135f),
+      Simplex(SimplexIndex(4L, context.indexPadding), 1.toByte, 1.0f),
+      Simplex(SimplexIndex(5L, context.indexPadding), 1.toByte, 1.0f)
     )
     assert(facets === expectedFacets)
   }
@@ -79,14 +83,15 @@ class SimplexSpec extends AnyFlatSpec with SharedSparkContext {
     // Point 2 -> [2, 1, 0] (index 0) radius = 1.414...
     // They should be ordered by CNS index descending, so 4, 1, then 0.
 
-    val simplex  = Simplex(index = 0L, dim = simplexDim, radius = 1.0f)
+    val simplex =
+      Simplex(index = SimplexIndex(0L, context.indexPadding), dim = simplexDim, radius = 1.0f)
     val iterator = simplex.getCofacets
 
     val cofacets = iterator.toList
     val expectedCofacets = List(
-      Simplex(4L, 2.toByte, 14.142136f),
-      Simplex(1L, 2.toByte, 1.4142135f),
-      Simplex(0L, 2.toByte, 1.4142135f)
+      Simplex(SimplexIndex(4L, context.indexPadding), 2.toByte, 14.142136f),
+      Simplex(SimplexIndex(1L, context.indexPadding), 2.toByte, 1.4142135f),
+      Simplex(SimplexIndex(0L, context.indexPadding), 2.toByte, 1.4142135f)
     )
     assert(cofacets === expectedCofacets)
   }
@@ -114,14 +119,16 @@ class SimplexSpec extends AnyFlatSpec with SharedSparkContext {
         5.0f
       )
 
-    val simplex  = Simplex(index = 0L, dim = simplexDim, radius = 1.0f)
+    val simplex =
+      Simplex(index = SimplexIndex(0L, context.indexPadding), dim = simplexDim, radius = 1.0f)
     val iterator = simplex.getCofacets
 
     val cofacets = iterator.toList
     // Only points 2 and 3 should form cofacets, point 4 is filtered out
     assert(cofacets.length === 2)
 
-    val expectedIndices = Set(0L, 1L)
+    val expectedIndices =
+      Set(SimplexIndex(0L, context.indexPadding), SimplexIndex(1L, context.indexPadding))
     assert(
       cofacets.map(_.index).toSet === expectedIndices
     )
@@ -149,9 +156,9 @@ class SimplexSpec extends AnyFlatSpec with SharedSparkContext {
     // Let's take simplex with vertices [2, 1, 0] (index 0)
     // Vertices are: (0,0), (3,0), (0,4)
     // Distances are: 3.0, 4.0, 5.0. Max distance is 5.0f
-    val simplex = Simplex(index = 0L, dim = 2.toByte)
+    val simplex = Simplex(BigInt(0L), 2.toByte)
 
-    assert(simplex.index === 0L)
+    assert(simplex.index === SimplexIndex(0L, context.indexPadding))
     assert(simplex.dim === 2.toByte)
     assert(simplex.radius === 5.0f)
   }

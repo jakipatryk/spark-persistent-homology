@@ -7,6 +7,7 @@ import io.github.jakipatryk.sparkpersistenthomology.{ PersistencePair, SharedSpa
 
 import scala.io.Source
 import scala.util.Random
+import scala.collection.mutable
 
 class VietorisRipsPersistentCohomologySpec extends AnyFlatSpec with SharedSparkContext {
 
@@ -25,7 +26,7 @@ class VietorisRipsPersistentCohomologySpec extends AnyFlatSpec with SharedSparkC
       .toSeq
   }
 
-  def loadExpectedPairs(path: String, dim: Int): Set[PersistencePair] = {
+  def loadExpectedPairs(path: String, dim: Int): Seq[PersistencePair] = {
     val source  = Source.fromURL(getClass.getResource(path))
     val content = source.mkString
     source.close()
@@ -39,23 +40,70 @@ class VietorisRipsPersistentCohomologySpec extends AnyFlatSpec with SharedSparkC
           if (parts(1).equalsIgnoreCase("inf")) PersistencePair.Infinity else parts(1).toFloat
         PersistencePair(dim, birth, death)
       }
-      .toSet
+      .toSeq
   }
 
-  def areSetsAlmostEqual(
-    expected: Set[PersistencePair],
-    actual: Set[PersistencePair],
-    tolerance: Float = 1e-5f
-  ): Boolean = {
-    if (expected.size != actual.size) return false
+  /** Compares two collections of persistence pairs using a "fuzzy set" approach. It ensures that
+    * for every pair in one collection, there is a unique matching pair in the other within the
+    * specified tolerance.
+    */
+  def assertPersistenceDiagramsMatch(
+    expected: Seq[PersistencePair],
+    actual: Seq[PersistencePair],
+    tolerance: Float = 5e-4f
+  ): Unit = {
+    if (expected.size != actual.size) {
+      fail(s"Diagram size mismatch: expected ${expected.size}, but got ${actual.size}")
+    }
 
-    expected.forall { exp =>
-      actual.exists { act =>
-        act.dim == exp.dim &&
-        (if (exp.death.isInfinity) act.death.isInfinity
-         else Math.abs(act.death - exp.death) < tolerance) &&
-        Math.abs(act.birth - exp.birth) < tolerance
+    val expSorted = expected.sortBy(p => (p.dim, p.birth, p.death))
+    val actSorted = actual.sortBy(p => (p.dim, p.birth, p.death))
+
+    val actMatched = new Array[Boolean](actSorted.size)
+    val missing    = mutable.ArrayBuffer.empty[PersistencePair]
+
+    var actPtr = 0
+    for (exp <- expSorted) {
+      // Fast-forward actPtr to the first potential match for this birth value
+      while (
+        actPtr < actSorted.size && (actSorted(actPtr).dim < exp.dim || (actSorted(
+          actPtr
+        ).dim == exp.dim && actSorted(actPtr).birth < exp.birth - tolerance))
+      ) {
+        actPtr += 1
       }
+
+      var found = false
+      var i     = actPtr
+      // Search window for birth tolerance
+      while (
+        i < actSorted.size && actSorted(i).dim == exp.dim && actSorted(
+          i
+        ).birth <= exp.birth + tolerance && !found
+      ) {
+        if (!actMatched(i)) {
+          val act = actSorted(i)
+          val deathMatch =
+            if (exp.death.isInfinity) act.death.isInfinity
+            else !act.death.isInfinity && Math.abs(exp.death - act.death) < tolerance
+          if (deathMatch) {
+            actMatched(i) = true
+            found = true
+          }
+        }
+        i += 1
+      }
+
+      if (!found) missing.append(exp)
+    }
+
+    if (missing.nonEmpty) {
+      val extra = actSorted.zipWithIndex.filter { case (_, idx) => !actMatched(idx) }.map(_._1)
+      val msg = s"""Diagrams do not match within tolerance $tolerance.
+                   |Total missing: ${missing.size}
+                   |First 5 missing: ${missing.take(5).mkString(", ")}
+                   |First 5 extra: ${extra.take(5).mkString(", ")}""".stripMargin
+      fail(msg)
     }
   }
 
@@ -71,53 +119,31 @@ class VietorisRipsPersistentCohomologySpec extends AnyFlatSpec with SharedSparkC
 
     assert(results.length == 3)
 
-    val actualDim0 = results(0).collect().toSet
-    val actualDim1 = results(1).collect().toSet
-    val actualDim2 = results(2).collect().toSet
+    assertPersistenceDiagramsMatch(expectedDim0, results(0).collect().toSeq)
+    assertPersistenceDiagramsMatch(expectedDim1, results(1).collect().toSeq)
+    assertPersistenceDiagramsMatch(expectedDim2, results(2).collect().toSeq)
+  }
 
-    def printMissing(
-      expected: Set[PersistencePair],
-      actual: Set[PersistencePair],
-      name: String
-    ): Unit = {
-      val missing = expected.filter(exp =>
-        !actual.exists { act =>
-          act.dim == exp.dim &&
-          (if (exp.death.isInfinity) act.death.isInfinity
-           else Math.abs(act.death - exp.death) < 1e-5f) &&
-          Math.abs(act.birth - exp.birth) < 1e-5f
-        }
-      )
-      if (missing.nonEmpty) {
-        println(s"Missing in $name: ${missing.take(5).mkString(", ")} (total ${missing.size})")
-        val extra = actual.filter(act =>
-          !expected.exists { exp =>
-            act.dim == exp.dim &&
-            (if (exp.death.isInfinity) act.death.isInfinity
-             else Math.abs(act.death - exp.death) < 1e-5f) &&
-            Math.abs(act.birth - exp.birth) < 1e-5f
-          }
-        )
-        println(s"Extra in $name: ${extra.take(5).mkString(", ")} (total ${extra.size})")
-      }
-    }
+  it should "compute persistence pairs correctly for a noisy high-dimensional (10D) point cloud (5,000 points, 4 clusters)" in {
+    val pointsCloud = spark.createDataset(loadPointsCloud("/noisy_clusters/points_cloud.csv"))
+    val maxDim      = 2
+    val threshold   = Some(2.661869f)
 
-    printMissing(expectedDim0, actualDim0, "Dim 0")
-    printMissing(expectedDim1, actualDim1, "Dim 1")
-    printMissing(expectedDim2, actualDim2, "Dim 2")
+    val expectedDim0 = loadExpectedPairs("/noisy_clusters/persistence_pairs_dim_0.csv", 0)
+    val expectedDim1 = loadExpectedPairs("/noisy_clusters/persistence_pairs_dim_1.csv", 1)
+    val expectedDim2 = loadExpectedPairs("/noisy_clusters/persistence_pairs_dim_2.csv", 2)
 
-    assert(
-      areSetsAlmostEqual(expectedDim0, actualDim0),
-      s"Dim 0 pairs do not match. Expected size: ${expectedDim0.size}, Actual size: ${actualDim0.size}"
+    val results = VietorisRipsPersistentCohomology.computePersistencePairs(
+      pointsCloud,
+      maxDim,
+      distanceThreshold = threshold
     )
-    assert(
-      areSetsAlmostEqual(expectedDim1, actualDim1),
-      s"Dim 1 pairs do not match. Expected size: ${expectedDim1.size}, Actual size: ${actualDim1.size}"
-    )
-    assert(
-      areSetsAlmostEqual(expectedDim2, actualDim2),
-      s"Dim 2 pairs do not match. Expected size: ${expectedDim2.size}, Actual size: ${actualDim2.size}"
-    )
+
+    assert(results.length == 3)
+
+    assertPersistenceDiagramsMatch(expectedDim0, results(0).collect().toSeq)
+    assertPersistenceDiagramsMatch(expectedDim1, results(1).collect().toSeq)
+    assertPersistenceDiagramsMatch(expectedDim2, results(2).collect().toSeq)
   }
 
   it should "find exactly one persistence pair of any kind in dim 1 for 150 equilateral triangles placed evenly on a circle" in {

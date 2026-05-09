@@ -3,7 +3,10 @@ package io.github.jakipatryk.sparkpersistenthomology.internal.vr
 import org.scalatest.flatspec.AnyFlatSpec
 import io.github.jakipatryk.sparkpersistenthomology.SharedSparkContext
 import io.github.jakipatryk.sparkpersistenthomology.distances.DistanceCalculator
-import io.github.jakipatryk.sparkpersistenthomology.internal.utils.CombinatorialNumberSystem
+import io.github.jakipatryk.sparkpersistenthomology.internal.utils.{
+  CombinatorialNumberSystem,
+  SimplexIndex
+}
 
 class MutableCoboundaryMatrixColumnSpec extends AnyFlatSpec with SharedSparkContext {
 
@@ -30,14 +33,15 @@ class MutableCoboundaryMatrixColumnSpec extends AnyFlatSpec with SharedSparkCont
         Float.PositiveInfinity
       )
 
-    val simplex = Simplex(index = 0L, dim = simplexDim, radius = 1.0f)
+    val simplex =
+      Simplex(index = SimplexIndex(0L, context.indexPadding), dim = simplexDim, radius = 1.0f)
     val col     = CoboundaryMatrixColumn(simplex)
     val mutable = MutableCoboundaryMatrixColumn(col)
 
     val resolved = mutable.toImmutableAndDrain.value
 
     val expectedChain = List(
-      Simplex(1L, 2.toByte, 1.4142135f)
+      Simplex(SimplexIndex(1L, context.indexPadding), 2.toByte, 1.4142135f)
     ).sorted(CoboundaryMatrixColumn.simplexFiltrationOrdering)
 
     assert(resolved.toList === expectedChain)
@@ -60,18 +64,22 @@ class MutableCoboundaryMatrixColumnSpec extends AnyFlatSpec with SharedSparkCont
         Float.PositiveInfinity
       )
 
-    val initial1 = Simplex(index = 0L, dim = simplexDim, radius = 1.0f)
-    val col1     = CoboundaryMatrixColumn(initial1)
+    val initial1 =
+      Simplex(index = SimplexIndex(0L, context.indexPadding), dim = simplexDim, radius = 1.0f)
+    val col1 = CoboundaryMatrixColumn(initial1)
 
-    val initial2 = Simplex(index = 1L, dim = simplexDim, radius = 2.0f)
-    val col2     = CoboundaryMatrixColumn(initial2)
+    val initial2 =
+      Simplex(index = SimplexIndex(1L, context.indexPadding), dim = simplexDim, radius = 2.0f)
+    val col2 = CoboundaryMatrixColumn(initial2)
 
     val mutable = MutableCoboundaryMatrixColumn(col1)
     mutable += col2
     val result = mutable.toImmutableAndDrain
 
     assert(result.value.length === 1)
-    assert(result.value.toSeq.contains(Simplex(2L, 2.toByte, 3.0f)))
+    assert(
+      result.value.toSeq.contains(Simplex(SimplexIndex(2L, context.indexPadding), 2.toByte, 3.0f))
+    )
   }
 
   it should "add birth simplex correctly" in {
@@ -94,10 +102,12 @@ class MutableCoboundaryMatrixColumnSpec extends AnyFlatSpec with SharedSparkCont
         Float.PositiveInfinity
       )
 
-    val initial1 = Simplex(index = 0L, dim = simplexDim, radius = 1.0f)
-    val col1     = CoboundaryMatrixColumn(initial1)
+    val initial1 =
+      Simplex(index = SimplexIndex(0L, context.indexPadding), dim = simplexDim, radius = 1.0f)
+    val col1 = CoboundaryMatrixColumn(initial1)
 
-    val birthSimplex = Simplex(index = 1L, dim = simplexDim, radius = 1.0f)
+    val birthSimplex =
+      Simplex(index = SimplexIndex(1L, context.indexPadding), dim = simplexDim, radius = 1.0f)
 
     val mutable = MutableCoboundaryMatrixColumn(col1)
     mutable += birthSimplex
@@ -107,7 +117,15 @@ class MutableCoboundaryMatrixColumnSpec extends AnyFlatSpec with SharedSparkCont
     // The previous test error message said it got a list of simplices.
     // Let's assert it's non-empty for now and update with the actual values.
     assert(result.value.length === 2)
-    assert(result.value.toSeq.contains(Simplex(2L, 2.toByte, 1.4142135f)))
-    assert(result.value.toSeq.contains(Simplex(1L, 2.toByte, 1.4142135f)))
+    assert(
+      result.value.toSeq.contains(
+        Simplex(SimplexIndex(2L, context.indexPadding), 2.toByte, 1.4142135f)
+      )
+    )
+    assert(
+      result.value.toSeq.contains(
+        Simplex(SimplexIndex(1L, context.indexPadding), 2.toByte, 1.4142135f)
+      )
+    )
   }
 }

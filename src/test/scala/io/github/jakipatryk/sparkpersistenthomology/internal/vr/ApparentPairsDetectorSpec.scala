@@ -45,13 +45,13 @@ class ApparentPairsDetectorSpec extends AnyFlatSpec with SharedSparkContext {
     // {2, 0} -> binom(2, 2) + binom(0, 1) = 1 + 0 = 1
     // {2, 1} -> binom(2, 2) + binom(1, 1) = 1 + 1 = 2
     // Longest edge is {2, 1} with index 2.
-    val edge01 = Simplex(0, 1, 0.50990195f) // {1, 0}
-    val edge02 = Simplex(1, 1, 0.50990195f) // {2, 0}
-    val edge12 = Simplex(2, 1, 1.0f)        // {2, 1}
+    val edge01 = Simplex(BigInt(0), 1, 0.50990195f) // {1, 0}
+    val edge02 = Simplex(BigInt(1), 1, 0.50990195f) // {2, 0}
+    val edge12 = Simplex(BigInt(2), 1, 1.0f)        // {2, 1}
 
     // CNS Index for triangle (combination of size 3):
     // {2, 1, 0} -> binom(2, 3) + binom(1, 2) + binom(0, 1) = 0 + 0 + 0 = 0
-    val triangle = Simplex(0, 2, 1.0f)
+    val triangle = Simplex(BigInt(0), 2, 1.0f)
 
     // Edge {2, 1} (index 2) and Triangle {2, 1, 0} (index 0) should be an apparent pair
     assert(ApparentPairsDetector.isInZeroApparentPair(edge12))
@@ -108,14 +108,14 @@ class ApparentPairsDetectorSpec extends AnyFlatSpec with SharedSparkContext {
     // {3, 2, 0} -> binom(3, 3) + binom(2, 2) + binom(0, 1) = 1 + 1 + 0 = 2
     // {3, 2, 1} -> binom(3, 3) + binom(2, 2) + binom(1, 1) = 1 + 1 + 1 = 3
 
-    val edge01 = Simplex(0, 1, 0.50990195f)
-    val edge02 = Simplex(1, 1, 0.50990195f)
-    val edge12 = Simplex(2, 1, 1.0f)
-    val edge13 = Simplex(4, 1, 2.0615528f)
-    val edge23 = Simplex(5, 1, 2.0615528f)
+    val edge01 = Simplex(BigInt(0), 1, 0.50990195f)
+    val edge02 = Simplex(BigInt(1), 1, 0.50990195f)
+    val edge12 = Simplex(BigInt(2), 1, 1.0f)
+    val edge13 = Simplex(BigInt(4), 1, 2.0615528f)
+    val edge23 = Simplex(BigInt(5), 1, 2.0615528f)
 
-    val triangle1 = Simplex(0, 2, 1.0f)
-    val triangle2 = Simplex(3, 2, 2.0615528f)
+    val triangle1 = Simplex(BigInt(0), 2, 1.0f)
+    val triangle2 = Simplex(BigInt(3), 2, 2.0615528f)
 
     // Check T1 and its apparent pair edge {2, 1}
     assert(ApparentPairsDetector.isInZeroApparentPair(edge12))

@@ -2,6 +2,8 @@ package io.github.jakipatryk.sparkpersistenthomology.internal.vr
 
 import org.apache.spark.sql.{ Dataset, SparkSession }
 
+import io.github.jakipatryk.sparkpersistenthomology.internal.utils.SimplexIndex
+
 private[sparkpersistenthomology] object CoboundaryMatrixConstructor {
 
   /** Constructs `Dataset` of [[CoboundaryMatrixColumn]] for columns that need to be reduced.
@@ -27,20 +29,14 @@ private[sparkpersistenthomology] object CoboundaryMatrixConstructor {
         range
     }
 
-    filteredRange.as[Long].mapPartitions { iter =>
+    filteredRange.mapPartitions { iter =>
       iter.flatMap { index =>
         val simplex = Simplex(index, dim)
         val shouldKeepTheSimplex = simplex.radius <= context.distanceThreshold &&
           !ApparentPairsDetector.isInZeroApparentPair(simplex)
 
         if (shouldKeepTheSimplex) {
-          val result = CoboundaryMatrixColumn(simplex)
-
-          if (result.value.nonEmpty) {
-            Some(result)
-          } else {
-            None
-          }
+          Some(CoboundaryMatrixColumn(simplex))
         } else {
           None
         }
@@ -50,13 +46,13 @@ private[sparkpersistenthomology] object CoboundaryMatrixConstructor {
 
   private def getValidIndicesForDim(
     dim: Byte
-  )(implicit context: FiltrationContext, spark: SparkSession): Dataset[Long] = {
+  )(implicit context: FiltrationContext, spark: SparkSession): Dataset[SimplexIndex] = {
     import spark.implicits._
     val combinationSize = Simplex.dimToCombinationSize(dim)
 
     if (dim == 0) {
       val numCombinations = context.cns.value.allCombinationsCount(combinationSize)
-      spark.range(numCombinations).as[Long]
+      spark.range(numCombinations.toLong).map(i => SimplexIndex(BigInt(i), context.indexPadding))
     } else {
       val numPoints = context.distanceMatrix.value.neighbors.length
 
@@ -66,7 +62,9 @@ private[sparkpersistenthomology] object CoboundaryMatrixConstructor {
           val cns            = context.cns.value
           val distanceMatrix = context.distanceMatrix.value
 
-          iter.flatMap(v => new CliqueIterator(v, combinationSize, distanceMatrix, cns))
+          iter
+            .flatMap(v => new CliqueIterator(v, combinationSize, distanceMatrix, cns))
+            .map(bi => SimplexIndex(bi, context.indexPadding))
         }
         .toDS()
     }
