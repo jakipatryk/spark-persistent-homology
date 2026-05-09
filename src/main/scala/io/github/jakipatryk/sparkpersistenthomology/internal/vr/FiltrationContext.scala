@@ -37,7 +37,7 @@ private[sparkpersistenthomology] object FiltrationContext {
     distanceThreshold: Float
   )(implicit spark: org.apache.spark.sql.SparkSession): FiltrationContext = {
     val distanceMatrix =
-      SparseDistanceMatrix(pointsCloud.value, distanceCalculator, distanceThreshold)
+      SparseDistanceMatrix(pointsCloud, distanceCalculator, distanceThreshold)
     val distanceMatrixBroadcast = spark.sparkContext.broadcast(distanceMatrix)
 
     val maxIndexPadding =

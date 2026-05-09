@@ -1,5 +1,8 @@
 package io.github.jakipatryk.sparkpersistenthomology.internal.vr
 
+import org.apache.spark.broadcast.Broadcast
+import org.apache.spark.sql.SparkSession
+
 /** Represents a sparse distance matrix for a point cloud.
   *
   * Stores neighbors and their respective distances for each point that are within a specific
@@ -79,39 +82,50 @@ private[sparkpersistenthomology] object SparseDistanceMatrix {
     *   A SparseDistanceMatrix.
     */
   def apply(
-    pointsCloud: Array[Array[Float]],
+    pointsCloud: Broadcast[Array[Array[Float]]],
     distanceCalculator: io.github.jakipatryk.sparkpersistenthomology.distances.DistanceCalculator,
     distanceThreshold: Float
-  ): SparseDistanceMatrix = {
-    val numPoints = pointsCloud.length
+  )(implicit spark: SparkSession): SparseDistanceMatrix = {
+    val numPoints = pointsCloud.value.length
+
+    val collectedNeighbors = spark.sparkContext
+      .parallelize(0 until numPoints)
+      .mapPartitions { iter =>
+        val points        = pointsCloud.value
+        val tempIndices   = new Array[Int](numPoints)
+        val tempDistances = new Array[Float](numPoints)
+
+        iter.map { i =>
+          val pointI = points(i)
+          var count  = 0
+
+          var j = numPoints - 1
+          while (j >= 0) {
+            if (i != j) {
+              val dist = distanceCalculator.calculateDistance(pointI, points(j))
+              if (dist <= distanceThreshold) {
+                tempIndices(count) = j
+                tempDistances(count) = dist
+                count += 1
+              }
+            }
+            j -= 1
+          }
+
+          val nbsIndices = new Array[Int](count)
+          val nbsDists   = new Array[Float](count)
+          System.arraycopy(tempIndices, 0, nbsIndices, 0, count)
+          System.arraycopy(tempDistances, 0, nbsDists, 0, count)
+
+          (i, nbsIndices, nbsDists)
+        }
+      }
+      .collect()
+
     val neighbors = new Array[Array[Int]](numPoints)
     val distances = new Array[Array[Float]](numPoints)
 
-    val tempIndices   = new Array[Int](numPoints)
-    val tempDistances = new Array[Float](numPoints)
-
-    for (i <- 0 until numPoints) {
-      val pointI = pointsCloud(i)
-      var count  = 0
-
-      var j = numPoints - 1
-      while (j >= 0) {
-        if (i != j) {
-          val dist = distanceCalculator.calculateDistance(pointI, pointsCloud(j))
-          if (dist <= distanceThreshold) {
-            tempIndices(count) = j
-            tempDistances(count) = dist
-            count += 1
-          }
-        }
-        j -= 1
-      }
-
-      val nbsIndices = new Array[Int](count)
-      val nbsDists   = new Array[Float](count)
-      System.arraycopy(tempIndices, 0, nbsIndices, 0, count)
-      System.arraycopy(tempDistances, 0, nbsDists, 0, count)
-
+    for ((i, nbsIndices, nbsDists) <- collectedNeighbors) {
       neighbors(i) = nbsIndices
       distances(i) = nbsDists
     }

@@ -1,10 +1,11 @@
 package io.github.jakipatryk.sparkpersistenthomology.internal.vr
 
+import io.github.jakipatryk.sparkpersistenthomology.SharedSparkContext
 import io.github.jakipatryk.sparkpersistenthomology.distances.DistanceCalculator
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
 
-class SparseDistanceMatrixSpec extends AnyFlatSpec with Matchers {
+class SparseDistanceMatrixSpec extends AnyFlatSpec with Matchers with SharedSparkContext {
 
   "SparseDistanceMatrix" should "correctly calculate common neighbors for intersecting neighborhoods" in {
     // Graph: 3 is connected to 2, 1, 0. 2 is connected to 1, 0. 1 is connected to 0.
@@ -56,9 +57,14 @@ class SparseDistanceMatrixSpec extends AnyFlatSpec with Matchers {
       Array(0.0f, 1.0f),
       Array(0.0f, 10.0f)
     )
-    val threshold = 2.0f
+    val threshold       = 2.0f
+    val pointsBroadcast = spark.sparkContext.broadcast(points)
     val matrix =
-      SparseDistanceMatrix(points, DistanceCalculator.EuclideanDistanceCalculator, threshold)
+      SparseDistanceMatrix(
+        pointsBroadcast,
+        DistanceCalculator.EuclideanDistanceCalculator,
+        threshold
+      )
 
     // 0 is close to 1 (dist=1) but far from 2 (dist=10)
     matrix.neighbors(0) shouldBe Array(1)
