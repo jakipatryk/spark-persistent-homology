@@ -59,6 +59,17 @@ val computedImage = PersistenceImage.fromPersistencePairsGaussian(
 val imageMatrix = computedImage.image // DenseMatrix from Spark ML
 ```
 
+## Configuration
+
+The library provides several configuration properties that can be set in the `SparkConf` or via `--conf` flag when submitting a Spark job.
+
+### Coboundary Matrix Reduction
+
+The coboundary matrix reduction is performed in two phases within a loop. You can tune the number of partitions for each phase to optimize performance:
+
+- `spark.persistenthomology.vr.reducer.explicit.partitions`: Number of partitions for the **Explicit Matrix Exhaustive Reduction** phase. This phase clusters columns with the same pivot into the same partition. It is recommended to set this value **relatively low** (e.g., 10-50) to maximize the effectiveness of local reductions within partitions. (Default: `10`)
+- `spark.persistenthomology.vr.reducer.apparent.partitions`: Number of partitions for the **Apparent Pair Shallow Matrix Reduction** phase. This phase performs reductions that are local to each column (using the apparent pairs optimization). It is recommended to set this value **high** to maximize parallelism across the cluster. (Default: `200`)
+
 ## Installation
 
 Add the following dependency to your `build.sbt`:
