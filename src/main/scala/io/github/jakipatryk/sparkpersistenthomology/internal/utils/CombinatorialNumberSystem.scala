@@ -145,26 +145,34 @@ private[sparkpersistenthomology] class CombinatorialNumberSystem(
   def subcombinationsIndicesIterator(combination: Combination): Iterator[(Index, Int, Int)] = {
     val n = combination.length
 
+    val prefixSumsSub = new Array[Long](n)
+    if (n > 0) {
+      prefixSumsSub(0) = 0L
+      var j = 1
+      while (j < n) {
+        prefixSumsSub(j) = prefixSumsSub(j - 1) + combinationsLookup(combination(j - 1), n - j)
+        j += 1
+      }
+    }
+
+    val suffixSumsSub = new Array[Long](n)
+    if (n > 0) {
+      suffixSumsSub(n - 1) = 0L
+      var j = n - 2
+      while (j >= 0) {
+        suffixSumsSub(j) =
+          suffixSumsSub(j + 1) + combinationsLookup(combination(j + 1), n - (j + 1))
+        j -= 1
+      }
+    }
+
     new Iterator[(Index, Int, Int)] {
       private var i = 0
 
       override def hasNext: Boolean = i < n
 
       override def next(): (Index, Int, Int) = {
-        // Calculate index of sub-combination [a_n, ..., a_{i+1}, a_{i-1}, ..., a_1]
-        // Elements before i (original positions n...n-i+1) are now at positions n-1...n-i
-        // Elements after i (original positions n-i-1...1) are now at positions n-i-1...1
-        var index = 0L
-        var j     = 0
-        while (j < i) {
-          index += combinationsLookup(combination(j), n - 1 - j)
-          j += 1
-        }
-        j = i + 1
-        while (j < n) {
-          index += combinationsLookup(combination(j), n - j)
-          j += 1
-        }
+        val index = prefixSumsSub(i) + suffixSumsSub(i)
 
         val removedIndex   = i
         val removedElement = combination(i)
@@ -187,13 +195,25 @@ private[sparkpersistenthomology] class CombinatorialNumberSystem(
   def supcombinationsIndicesIterator(combination: Combination): Iterator[(Index, Int)] = {
     val n = combination.length
 
+    val prefixSumsSup = new Array[Long](n + 1)
+    prefixSumsSup(0) = 0L
+    var j = 1
+    while (j <= n) {
+      prefixSumsSup(j) = prefixSumsSup(j - 1) + combinationsLookup(combination(j - 1), n + 2 - j)
+      j += 1
+    }
+
+    val suffixSumsSup = new Array[Long](n + 1)
+    suffixSumsSup(n) = 0L
+    j = n - 1
+    while (j >= 0) {
+      suffixSumsSup(j) = suffixSumsSup(j + 1) + combinationsLookup(combination(j), n - j)
+      j -= 1
+    }
+
     new Iterator[(Index, Int)] {
       private var currentElementToAdd = combinationElementsSetSize - 1
       private var combinationIndex    = 0
-
-      // Pre-calculate the base index parts that don't change frequently.
-      // Index = sum_{i=0}^{n} combinationsLookup(sup(i), (n+1)-i)
-      private var currentFullIndex = 0L
 
       private def advance(): Unit = {
         while (
@@ -213,21 +233,9 @@ private[sparkpersistenthomology] class CombinatorialNumberSystem(
       override def next(): (Index, Int) = {
         val addedElement = currentElementToAdd
 
-        // Calculate index incrementally or fully.
-        // For simplicity and correctness first, let's do it efficiently but robustly.
-        // We can optimize this if we see it's still slow.
-        var index = 0L
-        var i     = 0
-        while (i < combinationIndex) {
-          index += combinationsLookup(combination(i), n + 1 - i)
-          i += 1
-        }
-        index += combinationsLookup(addedElement, n + 1 - combinationIndex)
-        i = combinationIndex
-        while (i < n) {
-          index += combinationsLookup(combination(i), n - i)
-          i += 1
-        }
+        val index = prefixSumsSup(combinationIndex) +
+          combinationsLookup(addedElement, n + 1 - combinationIndex) +
+          suffixSumsSup(combinationIndex)
 
         currentElementToAdd -= 1
         advance()
@@ -245,6 +253,22 @@ private[sparkpersistenthomology] class CombinatorialNumberSystem(
     validElements: Array[Int]
   ): Iterator[(Index, Int)] = {
     val n = combination.length
+
+    val prefixSumsSup = new Array[Long](n + 1)
+    prefixSumsSup(0) = 0L
+    var j = 1
+    while (j <= n) {
+      prefixSumsSup(j) = prefixSumsSup(j - 1) + combinationsLookup(combination(j - 1), n + 2 - j)
+      j += 1
+    }
+
+    val suffixSumsSup = new Array[Long](n + 1)
+    suffixSumsSup(n) = 0L
+    j = n - 1
+    while (j >= 0) {
+      suffixSumsSup(j) = suffixSumsSup(j + 1) + combinationsLookup(combination(j), n - j)
+      j -= 1
+    }
 
     new Iterator[(Index, Int)] {
       private var validElementsIndex = 0
@@ -277,18 +301,9 @@ private[sparkpersistenthomology] class CombinatorialNumberSystem(
       override def next(): (Index, Int) = {
         val addedElement = nextAddedElement
 
-        var index = 0L
-        var i     = 0
-        while (i < combinationIndex) {
-          index += combinationsLookup(combination(i), n + 1 - i)
-          i += 1
-        }
-        index += combinationsLookup(addedElement, n + 1 - combinationIndex)
-        i = combinationIndex
-        while (i < n) {
-          index += combinationsLookup(combination(i), n - i)
-          i += 1
-        }
+        val index = prefixSumsSup(combinationIndex) +
+          combinationsLookup(addedElement, n + 1 - combinationIndex) +
+          suffixSumsSup(combinationIndex)
 
         advance()
         (index, addedElement)
