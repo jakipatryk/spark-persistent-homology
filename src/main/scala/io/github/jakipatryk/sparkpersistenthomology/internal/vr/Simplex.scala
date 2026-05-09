@@ -114,7 +114,7 @@ private[sparkpersistenthomology] case class Simplex(index: Long, dim: Byte, radi
         computeMaxDistanceFromPointWithThreshold(addedElement, simplexCombination, radius)
       val cofacetRadius = math.max(radius, maxDistanceToAddedPoint)
 
-      if (cofacetRadius <= context.distanceThreshold && cofacetRadius == radius) {
+      if (cofacetRadius == radius) {
         result = Some(Simplex(cofacetIndex, (dim + 1).toByte, cofacetRadius))
       }
     }
