@@ -15,7 +15,7 @@ import io.github.jakipatryk.sparkpersistenthomology.internal.utils.Combinatorial
   * It uses a depth-first search approach, avoiding allocations during iteration by reusing
   * pre-allocated arrays.
   */
-private[vr] class CliqueIterator(
+private[sparkpersistenthomology] class CliqueIterator(
   startVertex: Int,
   combinationSize: Int,
   distanceMatrix: SparseDistanceMatrix,

@@ -2,7 +2,7 @@ package io.github.jakipatryk.sparkpersistenthomology.internal.vr
 
 import scala.collection.mutable.ArrayBuffer
 
-/** Represents semi-implicitly coboundary matrix column.
+/** Represents coboundary matrix column.
   *
   * @param initialSimplex
   *   Simplex which uniquely identifies the column. The column initially is just coboundary of this

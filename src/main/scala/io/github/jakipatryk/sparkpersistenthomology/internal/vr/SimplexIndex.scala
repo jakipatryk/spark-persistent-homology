@@ -9,7 +9,9 @@ package io.github.jakipatryk.sparkpersistenthomology.internal.vr
   * @param value
   *   The string representation of the index, optionally padded with zeros.
   */
-case class SimplexIndex(value: String) extends Ordered[SimplexIndex] with Serializable {
+private[sparkpersistenthomology] case class SimplexIndex(value: String)
+    extends Ordered[SimplexIndex]
+    with Serializable {
 
   def compare(that: SimplexIndex): Int = this.value.compare(that.value)
 

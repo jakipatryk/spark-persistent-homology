@@ -4,7 +4,7 @@ import io.github.jakipatryk.sparkpersistenthomology.internal.utils.LazyModulo2So
 
 /** A mutable version of [[CoboundaryMatrixColumn]] used for high-performance local reduction.
   */
-private[vr] class MutableCoboundaryMatrixColumn(
+private[sparkpersistenthomology] class MutableCoboundaryMatrixColumn(
   val initialSimplex: Simplex,
   private val queue: LazyModulo2SortedArrayPriorityQueue[Simplex]
 )(implicit context: FiltrationContext) {

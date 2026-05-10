@@ -8,7 +8,7 @@ import scala.collection.mutable.LongMap
 import org.apache.spark.TaskContext
 import org.apache.spark.util.LongAccumulator
 
-object CoboundaryMatrixReducer {
+private[sparkpersistenthomology] object CoboundaryMatrixReducer {
 
   /** Reduces coboundary matrix for a single dim. Reduced matrix is guaranteed to have unique
     * non-empty pivots, where column of simplex `i` having pivot `j` means that there is persistence
