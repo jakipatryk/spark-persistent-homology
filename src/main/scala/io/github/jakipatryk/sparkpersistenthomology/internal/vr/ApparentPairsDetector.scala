@@ -43,7 +43,7 @@ private[sparkpersistenthomology] object ApparentPairsDetector extends Serializab
       .getOrElse(false)
   }
 
-  private[sparkpersistenthomology] def isDeathOfApparentPair(
+  def isDeathOfApparentPair(
     simplex: Simplex
   )(implicit context: FiltrationContext): Boolean = {
     getBirthIfIsDeathOfApparentPair(simplex).isDefined
