@@ -3,10 +3,7 @@ package io.github.jakipatryk.sparkpersistenthomology.internal.vr
 import org.scalatest.flatspec.AnyFlatSpec
 import io.github.jakipatryk.sparkpersistenthomology.SharedSparkContext
 import io.github.jakipatryk.sparkpersistenthomology.distances.DistanceCalculator
-import io.github.jakipatryk.sparkpersistenthomology.internal.utils.{
-  CombinatorialNumberSystem,
-  SimplexIndex
-}
+import io.github.jakipatryk.sparkpersistenthomology.internal.utils.CombinatorialNumberSystem
 
 class MutableCoboundaryMatrixColumnSpec extends AnyFlatSpec with SharedSparkContext {
 

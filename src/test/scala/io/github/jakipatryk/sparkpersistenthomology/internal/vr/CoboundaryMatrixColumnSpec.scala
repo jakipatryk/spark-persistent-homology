@@ -5,8 +5,6 @@ import io.github.jakipatryk.sparkpersistenthomology.SharedSparkContext
 import io.github.jakipatryk.sparkpersistenthomology.distances.DistanceCalculator
 import io.github.jakipatryk.sparkpersistenthomology.internal.utils.CombinatorialNumberSystem
 
-import io.github.jakipatryk.sparkpersistenthomology.internal.utils.SimplexIndex
-
 class CoboundaryMatrixColumnSpec extends AnyFlatSpec with SharedSparkContext {
 
   behavior of "apply"

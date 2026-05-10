@@ -2,8 +2,6 @@ package io.github.jakipatryk.sparkpersistenthomology.internal.vr
 
 import org.apache.spark.sql.{ Dataset, SparkSession }
 
-import io.github.jakipatryk.sparkpersistenthomology.internal.utils.SimplexIndex
-
 private[sparkpersistenthomology] object CoboundaryMatrixConstructor {
 
   /** Constructs `Dataset` of [[CoboundaryMatrixColumn]] for columns that need to be reduced.

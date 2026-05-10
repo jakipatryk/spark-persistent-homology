@@ -1,6 +1,5 @@
 package io.github.jakipatryk.sparkpersistenthomology.internal.vr
 
-import io.github.jakipatryk.sparkpersistenthomology.internal.utils.SimplexIndex
 import org.apache.spark.sql.Dataset
 import org.apache.spark.sql.SparkSession
 import org.apache.spark.sql.functions.col

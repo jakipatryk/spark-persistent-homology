@@ -1,9 +1,6 @@
 package io.github.jakipatryk.sparkpersistenthomology.internal.vr
 
-import io.github.jakipatryk.sparkpersistenthomology.internal.utils.{
-  CombinatorialNumberSystem,
-  SimplexIndex
-}
+import io.github.jakipatryk.sparkpersistenthomology.internal.utils.CombinatorialNumberSystem
 
 /** Iterator that finds all `combinationSize`-cliques (simplices) in a graph that contain a specific
   * vertex `startVertex`.

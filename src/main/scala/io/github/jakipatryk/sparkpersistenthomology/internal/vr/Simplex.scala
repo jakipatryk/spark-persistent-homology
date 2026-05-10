@@ -1,7 +1,5 @@
 package io.github.jakipatryk.sparkpersistenthomology.internal.vr
 
-import io.github.jakipatryk.sparkpersistenthomology.internal.utils.SimplexIndex
-
 private[sparkpersistenthomology] case class Simplex(index: SimplexIndex, dim: Byte, radius: Float) {
 
   import Simplex._

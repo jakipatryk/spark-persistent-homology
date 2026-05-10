@@ -6,8 +6,6 @@ import io.github.jakipatryk.sparkpersistenthomology.distances.DistanceCalculator
 import io.github.jakipatryk.sparkpersistenthomology.internal.utils.CombinatorialNumberSystem
 import org.apache.spark.sql.Dataset
 
-import io.github.jakipatryk.sparkpersistenthomology.internal.utils.SimplexIndex
-
 class CoboundaryMatrixConstructorSpec extends AnyFlatSpec with SharedSparkContext {
 
   behavior of "construct"
