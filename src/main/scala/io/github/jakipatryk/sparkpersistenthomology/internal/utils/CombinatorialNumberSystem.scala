@@ -14,12 +14,12 @@ private[sparkpersistenthomology] class CombinatorialNumberSystem(
 
   import CombinatorialNumberSystem._
 
-  private[sparkpersistenthomology] val combinationsLookup: LocalMatrix[Long] = {
-    val matrix = LocalMatrix.zero[Long](combinationElementsSetSize + 1, maxCombinationSize + 1)
+  private[sparkpersistenthomology] val combinationsLookup: LocalMatrix[BigInt] = {
+    val matrix = LocalMatrix.zero[BigInt](combinationElementsSetSize + 1, maxCombinationSize + 1)
 
     for (i <- 0 to combinationElementsSetSize) {
-      matrix(i, 0) = 1
-      if (i <= maxCombinationSize) matrix(i, i) = 1
+      matrix(i, 0) = BigInt(1)
+      if (i <= maxCombinationSize) matrix(i, i) = BigInt(1)
     }
 
     for {
@@ -34,7 +34,7 @@ private[sparkpersistenthomology] class CombinatorialNumberSystem(
   /** A count of all combinations of `combinationElementsSetSize` elements of size
     * `combinationSize`.
     */
-  def allCombinationsCount(combinationSize: Int): Long = {
+  def allCombinationsCount(combinationSize: Int): BigInt = {
     combinationsLookup(combinationElementsSetSize, combinationSize)
   }
 
@@ -85,7 +85,7 @@ private[sparkpersistenthomology] class CombinatorialNumberSystem(
     */
   def getIndexFromCombination(combination: Combination): Index = {
     val combinationSize = combination.length
-    var index           = 0L
+    var index           = BigInt(0)
     var i               = 0
     while (i < combinationSize) {
       val k = combinationSize - i
@@ -101,7 +101,7 @@ private[sparkpersistenthomology] class CombinatorialNumberSystem(
   def combinationsIterator(startIndex: Index, combinationSize: Int): Iterator[Combination] =
     new Iterator[Array[Int]] {
       private val count                                  = allCombinationsCount(combinationSize)
-      private var currentIndex                           = startIndex - 1
+      private var currentIndex: BigInt                   = startIndex - BigInt(1)
       private var currentCombination: Option[Array[Int]] = None
 
       override def hasNext: Boolean = currentIndex + 1 < count
@@ -145,26 +145,34 @@ private[sparkpersistenthomology] class CombinatorialNumberSystem(
   def subcombinationsIndicesIterator(combination: Combination): Iterator[(Index, Int, Int)] = {
     val n = combination.length
 
+    val prefixSumsSub = new Array[BigInt](n)
+    if (n > 0) {
+      prefixSumsSub(0) = BigInt(0)
+      var j = 1
+      while (j < n) {
+        prefixSumsSub(j) = prefixSumsSub(j - 1) + combinationsLookup(combination(j - 1), n - j)
+        j += 1
+      }
+    }
+
+    val suffixSumsSub = new Array[BigInt](n)
+    if (n > 0) {
+      suffixSumsSub(n - 1) = BigInt(0)
+      var j = n - 2
+      while (j >= 0) {
+        suffixSumsSub(j) =
+          suffixSumsSub(j + 1) + combinationsLookup(combination(j + 1), n - (j + 1))
+        j -= 1
+      }
+    }
+
     new Iterator[(Index, Int, Int)] {
       private var i = 0
 
       override def hasNext: Boolean = i < n
 
       override def next(): (Index, Int, Int) = {
-        // Calculate index of sub-combination [a_n, ..., a_{i+1}, a_{i-1}, ..., a_1]
-        // Elements before i (original positions n...n-i+1) are now at positions n-1...n-i
-        // Elements after i (original positions n-i-1...1) are now at positions n-i-1...1
-        var index = 0L
-        var j     = 0
-        while (j < i) {
-          index += combinationsLookup(combination(j), n - 1 - j)
-          j += 1
-        }
-        j = i + 1
-        while (j < n) {
-          index += combinationsLookup(combination(j), n - j)
-          j += 1
-        }
+        val index = prefixSumsSub(i) + suffixSumsSub(i)
 
         val removedIndex   = i
         val removedElement = combination(i)
@@ -187,13 +195,25 @@ private[sparkpersistenthomology] class CombinatorialNumberSystem(
   def supcombinationsIndicesIterator(combination: Combination): Iterator[(Index, Int)] = {
     val n = combination.length
 
+    val prefixSumsSup = new Array[BigInt](n + 1)
+    prefixSumsSup(0) = BigInt(0)
+    var j = 1
+    while (j <= n) {
+      prefixSumsSup(j) = prefixSumsSup(j - 1) + combinationsLookup(combination(j - 1), n + 2 - j)
+      j += 1
+    }
+
+    val suffixSumsSup = new Array[BigInt](n + 1)
+    suffixSumsSup(n) = BigInt(0)
+    j = n - 1
+    while (j >= 0) {
+      suffixSumsSup(j) = suffixSumsSup(j + 1) + combinationsLookup(combination(j), n - j)
+      j -= 1
+    }
+
     new Iterator[(Index, Int)] {
       private var currentElementToAdd = combinationElementsSetSize - 1
       private var combinationIndex    = 0
-
-      // Pre-calculate the base index parts that don't change frequently.
-      // Index = sum_{i=0}^{n} combinationsLookup(sup(i), (n+1)-i)
-      private var currentFullIndex = 0L
 
       private def advance(): Unit = {
         while (
@@ -213,21 +233,9 @@ private[sparkpersistenthomology] class CombinatorialNumberSystem(
       override def next(): (Index, Int) = {
         val addedElement = currentElementToAdd
 
-        // Calculate index incrementally or fully.
-        // For simplicity and correctness first, let's do it efficiently but robustly.
-        // We can optimize this if we see it's still slow.
-        var index = 0L
-        var i     = 0
-        while (i < combinationIndex) {
-          index += combinationsLookup(combination(i), n + 1 - i)
-          i += 1
-        }
-        index += combinationsLookup(addedElement, n + 1 - combinationIndex)
-        i = combinationIndex
-        while (i < n) {
-          index += combinationsLookup(combination(i), n - i)
-          i += 1
-        }
+        val index = prefixSumsSup(combinationIndex) +
+          combinationsLookup(addedElement, n + 1 - combinationIndex) +
+          suffixSumsSup(combinationIndex)
 
         currentElementToAdd -= 1
         advance()
@@ -237,11 +245,77 @@ private[sparkpersistenthomology] class CombinatorialNumberSystem(
     }
   }
 
+  /** Returns an iterator with all supcombinations (of length of input combination +1) of a given
+    * combination, restricted to elements in `validElements` (must be sorted descending).
+    */
+  def supcombinationsIndicesIterator(
+    combination: Combination,
+    validElements: Array[Int]
+  ): Iterator[(Index, Int)] = {
+    val n = combination.length
+
+    val prefixSumsSup = new Array[BigInt](n + 1)
+    prefixSumsSup(0) = BigInt(0)
+    var j = 1
+    while (j <= n) {
+      prefixSumsSup(j) = prefixSumsSup(j - 1) + combinationsLookup(combination(j - 1), n + 2 - j)
+      j += 1
+    }
+
+    val suffixSumsSup = new Array[BigInt](n + 1)
+    suffixSumsSup(n) = BigInt(0)
+    j = n - 1
+    while (j >= 0) {
+      suffixSumsSup(j) = suffixSumsSup(j + 1) + combinationsLookup(combination(j), n - j)
+      j -= 1
+    }
+
+    new Iterator[(Index, Int)] {
+      private var validElementsIndex = 0
+      private var combinationIndex   = 0
+      private var nextAddedElement   = -1
+
+      private def advance(): Unit = {
+        nextAddedElement = -1
+        while (validElementsIndex < validElements.length && nextAddedElement == -1) {
+          val candidate = validElements(validElementsIndex)
+
+          while (combinationIndex < n && combination(combinationIndex) > candidate) {
+            combinationIndex += 1
+          }
+
+          if (combinationIndex < n && combination(combinationIndex) == candidate) {
+            validElementsIndex += 1
+            combinationIndex += 1
+          } else {
+            nextAddedElement = candidate
+            validElementsIndex += 1
+          }
+        }
+      }
+
+      advance()
+
+      override def hasNext: Boolean = nextAddedElement >= 0
+
+      override def next(): (Index, Int) = {
+        val addedElement = nextAddedElement
+
+        val index = prefixSumsSup(combinationIndex) +
+          combinationsLookup(addedElement, n + 1 - combinationIndex) +
+          suffixSumsSup(combinationIndex)
+
+        advance()
+        (index, addedElement)
+      }
+    }
+  }
+
 }
 
 private[sparkpersistenthomology] object CombinatorialNumberSystem {
 
-  type Index       = Long
+  type Index       = BigInt
   type Combination = Array[Int]
 
   def apply(

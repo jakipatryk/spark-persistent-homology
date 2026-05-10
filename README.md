@@ -1,18 +1,12 @@
 # spark-persistent-homology
 
-Implementation of persistent homology computation in Apache Spark.
+Computation of persistent homology in Apache Spark.
 
-The goal of this project is to enable persistent homology computation in the context of big data for both topologists and non-topologists. It attempts leverages Spark's distributed computing capabilities to handle larger point clouds and higher-dimensional filtrations.
+The goal of this project is to enable persistent homology computation in the context of big data for both topologists and non-topologists. It leverages Spark's distributed computing capabilities to handle larger point clouds and higher-dimensional filtrations.
 
 ## Features
-
-- **Distributed Computation:** Uses Apache Spark to distribute the workload of computing filtrations and persistence pairs.
-- **Vietoris-Rips Filtration:** Computes persistent homology for Vietoris-Rips complexes
-- **Optimized Algorithm:** The algorithm is heavily inspired by [Ripser](https://github.com/Ripser/ripser)
-    - **Persistent Cohomology:** Computes persistent cohomology, which is typically faster than homology while yielding the same persistence pairs.
-    - **Clearing Optimization:** Efficiently skips redundant column reductions.
-    - **Apparent Pairs:** Further optimizes the reduction process by identifying pairs that can be matched without full reduction.
-- **Persistence Images:** Support for generating [Persistence Images](https://jmlr.org/papers/v18/16-337.html), a stable vector representation of persistent homology suitable for machine learning.
+- **Vietoris-Rips Persistent (Co)Homology:** Computes persistence pairs for Vietoris-Rips filtration. The algorithm is inspired by [Ripser](https://github.com/Ripser/ripser) and [Ripser++](https://github.com/simonzhang00/ripser-plusplus) - it uses apparent pair optimization, clearing optimization, but bunch of things have been changed due to distributed nature of computation in this library, for example locally-exhaustive reduction and compress optimization with apparent pairs have been implemented, and matrix representation is only semi-implicit.  
+- **Persistence Images:** Support for generating [Persistence Images](https://jmlr.org/papers/v18/16-337.html), a stable vector representation of persistent homology suitable for machine learning or data drift detection.
 
 ## API Usage
 
@@ -59,6 +53,17 @@ val computedImage = PersistenceImage.fromPersistencePairsGaussian(
 val imageMatrix = computedImage.image // DenseMatrix from Spark ML
 ```
 
+### Configuration
+
+The library provides several configuration properties that can be set in the `SparkConf` or via `--conf` flag when submitting a Spark job.
+
+#### Vietoris-Rips Coboundary Matrix Reduction
+
+The coboundary matrix reduction is performed in two phases within a loop. You can tune the number of partitions for each phase to optimize performance:
+
+- `spark.persistenthomology.vr.reducer.explicit.partitions`: Number of partitions for the **Explicit Matrix Exhaustive Reduction** phase. This phase clusters columns with the same pivot into the same partition. It is recommended to set this value **relatively low** (e.g., 10-50) to maximize the effectiveness of local reductions within partitions. (Default: `10`)
+- `spark.persistenthomology.vr.reducer.apparent.partitions`: Number of partitions for the **Apparent Pair Shallow Matrix Reduction** phase. This phase performs reductions that are local to each column (using the apparent pairs optimization). It is recommended to set this value **high** to maximize parallelism across the cluster. (Default: `200`)
+
 ## Installation
 
 Add the following dependency to your `build.sbt`:
@@ -83,8 +88,10 @@ mise exec -- sbt test
 
 ## References
 
-- Bauer, U. (2021). [Ripser: efficient computation of Vietoris–Rips persistence barcodes](https://link.springer.com/article/10.1007/s41468-021-00071-5). Journal of Applied and Computational Topology.
-- Adams, H., et al. (2017). [Persistence Images: A Stable Vector Representation of Persistent Homology](https://jmlr.org/papers/v18/16-337.html). Journal of Machine Learning Research.
+- [Ripser: efficient computation of Vietoris–Rips persistence barcodes](https://link.springer.com/article/10.1007/s41468-021-00071-5)
+- [Persistence Images: A Stable Vector Representation of Persistent Homology](https://jmlr.org/papers/v18/16-337.html)
+- [GPU-Accelerated Computation of Vietoris-Rips Persistence Barcodes](https://arxiv.org/abs/2003.07989)
+- [Keeping it sparse: Computing Persistent Homology revisited](https://arxiv.org/abs/2211.09075)
 
 ## License
 

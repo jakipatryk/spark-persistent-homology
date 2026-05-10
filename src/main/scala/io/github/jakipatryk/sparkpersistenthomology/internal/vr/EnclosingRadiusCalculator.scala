@@ -4,7 +4,7 @@ import org.apache.spark.sql.Dataset
 import org.apache.spark.broadcast.Broadcast
 import io.github.jakipatryk.sparkpersistenthomology.distances.DistanceCalculator
 
-object EnclosingRadiusCalculator {
+private[sparkpersistenthomology] object EnclosingRadiusCalculator {
 
   /** Computes enclosing radius of a points cloud.
     *

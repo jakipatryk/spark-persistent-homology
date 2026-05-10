@@ -9,7 +9,7 @@ class CoboundaryMatrixColumnSpec extends AnyFlatSpec with SharedSparkContext {
 
   behavior of "apply"
 
-  it should "create a column with correct initialSimplex and valueTopEntries" in {
+  it should "create a column with correct initialSimplex and value" in {
     val distanceCalculator = DistanceCalculator.EuclideanDistanceCalculator
     val pointsCloud5 = Array(
       Array(0.0f, 0.0f),
@@ -18,7 +18,7 @@ class CoboundaryMatrixColumnSpec extends AnyFlatSpec with SharedSparkContext {
       Array(1.0f, 1.0f),
       Array(10.0f, 10.0f)
     )
-    val cns              = CombinatorialNumberSystem(5, 3)
+    val cns              = CombinatorialNumberSystem(5, 5)
     val simplexDim: Byte = 1
 
     implicit val context: FiltrationContext =
@@ -29,53 +29,63 @@ class CoboundaryMatrixColumnSpec extends AnyFlatSpec with SharedSparkContext {
         Float.PositiveInfinity
       )
 
-    val initialSimplex = Simplex(index = 0L, dim = simplexDim, radius = 1.0f)
+    val initialSimplex = Simplex(index = BigInt(0), dim = simplexDim)
     val column         = CoboundaryMatrixColumn(initialSimplex)
 
     assert(column.initialSimplex === initialSimplex)
-    assert(column.simplicesAdded.isEmpty)
 
-    val expectedTopEntries = Array(
-      Simplex(1, 2, 1.4142135f),
-      Simplex(0, 2, 1.4142135f),
-      Simplex(4, 2, 14.142136f)
+    val expectedValue = Array(
+      Simplex(BigInt(1), 2, 1.4142135f)
     )
-    assert(column.valueTopEntries === expectedTopEntries)
+    val sortedExpectedValue = expectedValue.sorted(CoboundaryMatrixColumn.simplexFiltrationOrdering)
+    assert(column.value === sortedExpectedValue)
   }
 
   behavior of "pivotExpression"
 
-  it should "return -1L when valueTopEntries is empty" in {
+  it should "return -1 when value is empty" in {
     import spark.implicits._
+    val pointsCloud5 = Array(Array(0.0f, 0.0f))
+    val cns          = CombinatorialNumberSystem(1, 1)
+    implicit val context: FiltrationContext = FiltrationContext(
+      sparkContext.broadcast(cns),
+      sparkContext.broadcast(pointsCloud5),
+      DistanceCalculator.EuclideanDistanceCalculator,
+      Float.PositiveInfinity
+    )
 
     val df = Seq(
       CoboundaryMatrixColumn(
-        initialSimplex = Simplex(0L, 0.toByte, 0.0f),
-        simplicesAdded = Array.empty,
-        valueTopEntries = Array.empty,
-        isTruncated = false
+        initialSimplex = Simplex(BigInt(0), 0.toByte, 0.0f),
+        value = Array.empty
       )
     ).toDS()
 
-    val result = df.select(CoboundaryMatrixColumn.pivotExpression).as[Long].collect()
+    val result = df.select(CoboundaryMatrixColumn.pivotExpression).as[String].collect()
 
-    assert(result === Array(-1L))
+    assert(result === Array(SimplexIndex(BigInt(-1), context.indexPadding).value))
   }
 
-  it should "return the index of the first element when valueTopEntries is not empty" in {
+  it should "return the index of the first element when value is not empty" in {
     import spark.implicits._
+    val pointsCloud5 = Array(Array(0.0f, 0.0f))
+    val cns          = CombinatorialNumberSystem(1, 1)
+    implicit val context: FiltrationContext = FiltrationContext(
+      sparkContext.broadcast(cns),
+      sparkContext.broadcast(pointsCloud5),
+      DistanceCalculator.EuclideanDistanceCalculator,
+      Float.PositiveInfinity
+    )
 
     val df = Seq(
       CoboundaryMatrixColumn(
-        initialSimplex = Simplex(0L, 0.toByte, 0.0f),
-        simplicesAdded = Array.empty,
-        valueTopEntries = Array(Simplex(123L, 1.toByte, 1.0f), Simplex(456L, 1.toByte, 2.0f)),
-        isTruncated = false
+        initialSimplex = Simplex(BigInt(0), 0.toByte, 0.0f),
+        value = Array(Simplex(BigInt(123), 1.toByte, 1.0f), Simplex(BigInt(456), 1.toByte, 2.0f))
       )
     ).toDS()
 
-    val result = df.select(CoboundaryMatrixColumn.pivotExpression).as[Long].collect()
+    val result = df.select(CoboundaryMatrixColumn.pivotExpression).as[String].collect()
 
-    assert(result === Array(123L))
+    assert(result === Array(SimplexIndex(BigInt(123), context.indexPadding).value))
   }
 }
