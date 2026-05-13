@@ -16,8 +16,6 @@ inThisBuild(
 
 name := "spark-persistent-homology"
 
-version := "0.1.0-SNAPSHOT"
-
 scalaVersion := "2.12.21"
 
 scalacOptions ++= Seq("-feature", "-language:postfixOps")
