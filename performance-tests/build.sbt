@@ -10,7 +10,7 @@ lazy val root = (project in file("."))
 libraryDependencies += "org.apache.spark" %% "spark-core" % "3.5.8" % "provided"
 libraryDependencies += "org.apache.spark" %% "spark-sql" % "3.5.8" % "provided"
 libraryDependencies += "org.apache.spark" %% "spark-mllib" % "3.5.8" % "provided"
-libraryDependencies += "io.github.jakipatryk" %% "spark-persistent-homology" % "0.1.0-SNAPSHOT"
+libraryDependencies += "io.github.jakipatryk" %% "spark-persistent-homology" % "0.1.0"
 libraryDependencies += "com.github.scopt" %% "scopt" % "4.1.0"
 
 Compile / classLoaderLayeringStrategy := ClassLoaderLayeringStrategy.Flat
