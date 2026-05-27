@@ -1,41 +1,43 @@
 package io.github.jakipatryk.sparkpersistenthomology.internal.flag
 
 import org.scalatest.flatspec.AnyFlatSpec
-import io.github.jakipatryk.sparkpersistenthomology.SharedSparkContext
-import io.github.jakipatryk.sparkpersistenthomology.distances.DistanceCalculator
+import io.github.jakipatryk.sparkpersistenthomology.{ FiltrationConfig, SharedSparkContext }
+import io.github.jakipatryk.sparkpersistenthomology.internal.flag._
 import io.github.jakipatryk.sparkpersistenthomology.internal.utils.CombinatorialNumberSystem
 
 class CoboundaryMatrixColumnSpec extends AnyFlatSpec with SharedSparkContext {
 
+  import spark.implicits._
+
   behavior of "apply"
 
   it should "create a column with correct initialSimplex and value" in {
-    val distanceCalculator = DistanceCalculator.EuclideanDistanceCalculator
-    val pointsCloud5 = Array(
+    val pointsCloud = Array(
       Array(0.0f, 0.0f),
       Array(1.0f, 0.0f),
       Array(0.0f, 1.0f),
       Array(1.0f, 1.0f),
       Array(10.0f, 10.0f)
     )
-    val cns              = CombinatorialNumberSystem(5, 5)
-    val simplexDim: Byte = 1
+    val pointsDS = spark.createDataset(pointsCloud)
+    val config   = FiltrationConfig.VietorisRips()
+    val cns      = CombinatorialNumberSystem(5, 5)
 
-    implicit val context: FiltrationContext =
-      FiltrationContext(
-        sparkContext.broadcast(cns),
-        sparkContext.broadcast(pointsCloud5),
-        distanceCalculator,
-        Float.PositiveInfinity
-      )
+    implicit val context: FiltrationContext = FiltrationContext(
+      sparkContext.broadcast(cns),
+      pointsDS,
+      sparkContext.broadcast(pointsCloud),
+      config
+    )
 
-    val initialSimplex = Simplex(index = BigInt(0), dim = simplexDim)
-    val column         = CoboundaryMatrixColumn(initialSimplex)
+    val initialSimplex =
+      Simplex(index = SimplexIndex(BigInt(0), context.indexPadding), dim = 1.toByte, radius = 0.0f)
+    val column = CoboundaryMatrixColumn(initialSimplex)
 
     assert(column.initialSimplex === initialSimplex)
 
     val expectedValue = Array(
-      Simplex(BigInt(1), 2, 1.4142135f)
+      Simplex(SimplexIndex(BigInt(1), context.indexPadding), 2.toByte, 1.4142135f)
     )
     val sortedExpectedValue = expectedValue.sorted(CoboundaryMatrixColumn.simplexFiltrationOrdering)
     assert(column.value === sortedExpectedValue)
@@ -44,19 +46,21 @@ class CoboundaryMatrixColumnSpec extends AnyFlatSpec with SharedSparkContext {
   behavior of "pivotExpression"
 
   it should "return -1 when value is empty" in {
-    import spark.implicits._
-    val pointsCloud5 = Array(Array(0.0f, 0.0f))
-    val cns          = CombinatorialNumberSystem(1, 1)
+    val pointsCloud = Array(Array(0.0f, 0.0f))
+    val pointsDS    = spark.createDataset(pointsCloud)
+    val config      = FiltrationConfig.VietorisRips()
+    val cns         = CombinatorialNumberSystem(1, 1)
+
     implicit val context: FiltrationContext = FiltrationContext(
       sparkContext.broadcast(cns),
-      sparkContext.broadcast(pointsCloud5),
-      DistanceCalculator.EuclideanDistanceCalculator,
-      Float.PositiveInfinity
+      pointsDS,
+      sparkContext.broadcast(pointsCloud),
+      config
     )
 
     val df = Seq(
       CoboundaryMatrixColumn(
-        initialSimplex = Simplex(BigInt(0), 0.toByte, 0.0f),
+        initialSimplex = Simplex(SimplexIndex(BigInt(0), context.indexPadding), 0.toByte, 0.0f),
         value = Array.empty
       )
     ).toDS()
@@ -67,20 +71,25 @@ class CoboundaryMatrixColumnSpec extends AnyFlatSpec with SharedSparkContext {
   }
 
   it should "return the index of the first element when value is not empty" in {
-    import spark.implicits._
-    val pointsCloud5 = Array(Array(0.0f, 0.0f))
-    val cns          = CombinatorialNumberSystem(1, 1)
+    val pointsCloud = Array(Array(0.0f, 0.0f))
+    val pointsDS    = spark.createDataset(pointsCloud)
+    val config      = FiltrationConfig.VietorisRips()
+    val cns         = CombinatorialNumberSystem(1, 1)
+
     implicit val context: FiltrationContext = FiltrationContext(
       sparkContext.broadcast(cns),
-      sparkContext.broadcast(pointsCloud5),
-      DistanceCalculator.EuclideanDistanceCalculator,
-      Float.PositiveInfinity
+      pointsDS,
+      sparkContext.broadcast(pointsCloud),
+      config
     )
 
     val df = Seq(
       CoboundaryMatrixColumn(
-        initialSimplex = Simplex(BigInt(0), 0.toByte, 0.0f),
-        value = Array(Simplex(BigInt(123), 1.toByte, 1.0f), Simplex(BigInt(456), 1.toByte, 2.0f))
+        initialSimplex = Simplex(SimplexIndex(BigInt(0), context.indexPadding), 0.toByte, 0.0f),
+        value = Array(
+          Simplex(SimplexIndex(BigInt(123), context.indexPadding), 1.toByte, 1.0f),
+          Simplex(SimplexIndex(BigInt(456), context.indexPadding), 1.toByte, 2.0f)
+        )
       )
     ).toDS()
 

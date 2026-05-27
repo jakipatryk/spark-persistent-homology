@@ -1,18 +1,17 @@
 package io.github.jakipatryk.sparkpersistenthomology.internal.flag
 
-import io.github.jakipatryk.sparkpersistenthomology.distances.DistanceCalculator
 import org.apache.spark.sql.Dataset
 import io.github.jakipatryk.sparkpersistenthomology.PersistencePair
 import org.apache.spark.sql.SparkSession
 import io.github.jakipatryk.sparkpersistenthomology.internal.utils.CombinatorialNumberSystem
+import io.github.jakipatryk.sparkpersistenthomology.FiltrationConfig
 
 private[sparkpersistenthomology] object FlagFiltrationPersistentCohomology {
 
   def computePersistencePairs(
     pointsCloud: Dataset[Array[Float]],
     maxDim: Int,
-    distanceCalculator: DistanceCalculator = DistanceCalculator.EuclideanDistanceCalculator,
-    distanceThreshold: Option[Float] = None
+    config: FiltrationConfig
   )(implicit spark: SparkSession): Array[Dataset[PersistencePair]] = {
     import spark.implicits._
 
@@ -27,15 +26,12 @@ private[sparkpersistenthomology] object FlagFiltrationPersistentCohomology {
     val cns                = new CombinatorialNumberSystem(numPoints, maxCombinationSize)
     val cnsBroadcast       = spark.sparkContext.broadcast(cns)
     val pointsBroadcast    = spark.sparkContext.broadcast(pointsArr)
-    val threshold = distanceThreshold.getOrElse(
-      EnclosingRadiusCalculator.computeRadius(pointsCloud, pointsBroadcast, distanceCalculator)
-    )
 
     implicit val context: FiltrationContext = FiltrationContext(
       cnsBroadcast,
+      pointsCloud,
       pointsBroadcast,
-      distanceCalculator,
-      threshold
+      config
     )
 
     pointsBroadcast.unpersist()

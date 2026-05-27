@@ -1,7 +1,9 @@
 package io.github.jakipatryk.sparkpersistenthomology.internal.flag
 
+import io.github.jakipatryk.sparkpersistenthomology.FiltrationConfig
+
 import org.apache.spark.broadcast.Broadcast
-import org.apache.spark.sql.SparkSession
+import org.apache.spark.sql.{ SparkSession, Dataset }
 
 /** Represents a sparse distance matrix for a point cloud.
   *
@@ -70,22 +72,28 @@ private[sparkpersistenthomology] case class SparseDistanceMatrix(
 
 private[sparkpersistenthomology] object SparseDistanceMatrix {
 
-  /** Creates a sparse distance matrix from a point cloud.
-    *
-    * @param pointsCloud
-    *   Array of point coordinates.
-    * @param distanceCalculator
-    *   Strategy to compute distances between points.
-    * @param distanceThreshold
-    *   Maximum distance for points to be considered neighbors.
-    * @return
-    *   A SparseDistanceMatrix.
-    */
   def apply(
-    pointsCloud: Broadcast[Array[Array[Float]]],
-    distanceCalculator: io.github.jakipatryk.sparkpersistenthomology.distances.DistanceCalculator,
-    distanceThreshold: Float
+    config: FiltrationConfig,
+    pointsCloudDS: Dataset[Array[Float]],
+    pointsCloud: Broadcast[Array[Array[Float]]]
   )(implicit spark: SparkSession): SparseDistanceMatrix = {
+    config match {
+      case vr: FiltrationConfig.VietorisRips =>
+        createVietorisRipsMatrix(pointsCloudDS, pointsCloud, vr)
+      case nn: FiltrationConfig.NearestNeighbors =>
+        createNearestNeighborsMatrix(pointsCloud, nn)
+    }
+  }
+
+  private def createVietorisRipsMatrix(
+    pointsCloudDS: Dataset[Array[Float]],
+    pointsCloud: Broadcast[Array[Array[Float]]],
+    config: FiltrationConfig.VietorisRips
+  )(implicit spark: SparkSession): SparseDistanceMatrix = {
+    val threshold = config.distanceThreshold.getOrElse(
+      EnclosingRadiusCalculator.computeRadius(pointsCloudDS, pointsCloud, config.distanceCalculator)
+    )
+
     val numPoints = pointsCloud.value.length
 
     val collectedNeighbors = spark.sparkContext
@@ -102,8 +110,8 @@ private[sparkpersistenthomology] object SparseDistanceMatrix {
           var j = numPoints - 1
           while (j >= 0) {
             if (i != j) {
-              val dist = distanceCalculator.calculateDistance(pointI, points(j))
-              if (dist <= distanceThreshold) {
+              val dist = config.distanceCalculator.calculateDistance(pointI, points(j))
+              if (dist <= threshold) {
                 tempIndices(count) = j
                 tempDistances(count) = dist
                 count += 1
@@ -131,5 +139,12 @@ private[sparkpersistenthomology] object SparseDistanceMatrix {
     }
 
     SparseDistanceMatrix(neighbors, distances)
+  }
+
+  private def createNearestNeighborsMatrix(
+    pointsCloud: Broadcast[Array[Array[Float]]],
+    config: FiltrationConfig.NearestNeighbors
+  )(implicit spark: SparkSession): SparseDistanceMatrix = {
+    ???
   }
 }

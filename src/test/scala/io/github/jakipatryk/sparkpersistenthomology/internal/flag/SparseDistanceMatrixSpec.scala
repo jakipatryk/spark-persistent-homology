@@ -1,11 +1,13 @@
 package io.github.jakipatryk.sparkpersistenthomology.internal.flag
 
-import io.github.jakipatryk.sparkpersistenthomology.SharedSparkContext
+import io.github.jakipatryk.sparkpersistenthomology.{ FiltrationConfig, SharedSparkContext }
 import io.github.jakipatryk.sparkpersistenthomology.distances.DistanceCalculator
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
 
 class SparseDistanceMatrixSpec extends AnyFlatSpec with Matchers with SharedSparkContext {
+
+  import spark.implicits._
 
   "SparseDistanceMatrix" should "correctly calculate common neighbors for intersecting neighborhoods" in {
     // Graph: 3 is connected to 2, 1, 0. 2 is connected to 1, 0. 1 is connected to 0.
@@ -59,11 +61,13 @@ class SparseDistanceMatrixSpec extends AnyFlatSpec with Matchers with SharedSpar
     )
     val threshold       = 2.0f
     val pointsBroadcast = spark.sparkContext.broadcast(points)
+    val config          = FiltrationConfig.VietorisRips(distanceThreshold = Some(threshold))
+
     val matrix =
       SparseDistanceMatrix(
-        pointsBroadcast,
-        DistanceCalculator.EuclideanDistanceCalculator,
-        threshold
+        config,
+        spark.createDataset(points),
+        pointsBroadcast
       )
 
     // 0 is close to 1 (dist=1) but far from 2 (dist=10)

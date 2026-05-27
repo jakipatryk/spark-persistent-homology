@@ -3,7 +3,11 @@ package io.github.jakipatryk.sparkpersistenthomology.internal.flag
 import io.github.jakipatryk.sparkpersistenthomology.distances.DistanceCalculator
 import org.apache.spark.sql.Dataset
 import org.scalatest.flatspec.AnyFlatSpec
-import io.github.jakipatryk.sparkpersistenthomology.{ PersistencePair, SharedSparkContext }
+import io.github.jakipatryk.sparkpersistenthomology.{
+  FiltrationConfig,
+  PersistencePair,
+  SharedSparkContext
+}
 
 import scala.io.Source
 import scala.util.Random
@@ -115,7 +119,11 @@ class FlagFiltrationPersistentCohomologySpec extends AnyFlatSpec with SharedSpar
     val expectedDim1 = loadExpectedPairs("/three_spheres/persistence_pairs_dim_1.csv", 1)
     val expectedDim2 = loadExpectedPairs("/three_spheres/persistence_pairs_dim_2.csv", 2)
 
-    val results = FlagFiltrationPersistentCohomology.computePersistencePairs(pointsCloud, maxDim)
+    val results = FlagFiltrationPersistentCohomology.computePersistencePairs(
+      pointsCloud,
+      maxDim,
+      FiltrationConfig.VietorisRips()
+    )
 
     assert(results.length == 3)
 
@@ -136,7 +144,7 @@ class FlagFiltrationPersistentCohomologySpec extends AnyFlatSpec with SharedSpar
     val results = FlagFiltrationPersistentCohomology.computePersistencePairs(
       pointsCloud,
       maxDim,
-      distanceThreshold = threshold
+      FiltrationConfig.VietorisRips(distanceThreshold = threshold)
     )
 
     assert(results.length == 3)
@@ -170,7 +178,11 @@ class FlagFiltrationPersistentCohomologySpec extends AnyFlatSpec with SharedSpar
 
     val pointsCloud = spark.createDataset(points)
     val maxDim      = 1
-    val results = FlagFiltrationPersistentCohomology.computePersistencePairs(pointsCloud, maxDim)
+    val results = FlagFiltrationPersistentCohomology.computePersistencePairs(
+      pointsCloud,
+      maxDim,
+      FiltrationConfig.VietorisRips()
+    )
 
     val dim1Pairs = results(1).collect()
 
@@ -208,7 +220,11 @@ class FlagFiltrationPersistentCohomologySpec extends AnyFlatSpec with SharedSpar
     val pointsCloud = generateTorusPoints(numPoints)
     val maxDim      = 0
 
-    val results = FlagFiltrationPersistentCohomology.computePersistencePairs(pointsCloud, maxDim)
+    val results = FlagFiltrationPersistentCohomology.computePersistencePairs(
+      pointsCloud,
+      maxDim,
+      FiltrationConfig.VietorisRips()
+    )
 
     val dim0Pairs     = results(0).collect()
     val infinitePairs = dim0Pairs.filter(_.death.isInfinity)

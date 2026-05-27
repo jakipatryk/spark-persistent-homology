@@ -1,11 +1,13 @@
 package io.github.jakipatryk.sparkpersistenthomology.internal.flag
 
 import org.scalatest.flatspec.AnyFlatSpec
-import io.github.jakipatryk.sparkpersistenthomology.SharedSparkContext
-import io.github.jakipatryk.sparkpersistenthomology.distances.DistanceCalculator
+import io.github.jakipatryk.sparkpersistenthomology.{ FiltrationConfig, SharedSparkContext }
+import io.github.jakipatryk.sparkpersistenthomology.internal.flag._
 import io.github.jakipatryk.sparkpersistenthomology.internal.utils.CombinatorialNumberSystem
 
 class SimplexSpec extends AnyFlatSpec with SharedSparkContext {
+
+  import spark.implicits._
 
   behavior of "getFacets"
 
@@ -16,36 +18,30 @@ class SimplexSpec extends AnyFlatSpec with SharedSparkContext {
       Array(0.0f, 1.0f),
       Array(1.0f, 1.0f)
     )
-    val distanceCalculator = DistanceCalculator.EuclideanDistanceCalculator
+    val pointsDS = spark.createDataset(pointsCloud)
+    val config   = FiltrationConfig.VietorisRips()
+    val cns      = CombinatorialNumberSystem(4, 5)
 
-    // We have 4 points. max combination size up to 3
-    val cns              = CombinatorialNumberSystem(4, 5)
-    val simplexDim: Byte = 2 // max combination size is 3
-
-    implicit val context =
-      FiltrationContext(
-        sparkContext.broadcast(cns),
-        sparkContext.broadcast(pointsCloud),
-        distanceCalculator,
-        Float.PositiveInfinity
-      )
-
-    // Let's take simplex with vertices [3, 2, 1] (index 3)
-    // Its facets are:
-    // [2, 1] (index 2), max distance = 1.4142135f (removed 3)
-    // [3, 1] (index 4), max distance = 1.0f (removed 2)
-    // [3, 2] (index 5), max distance = 1.0f (removed 1)
-    // They should be ordered by CNS index ascending, so [2, 1], [3, 1], then [3, 2]
+    implicit val context: FiltrationContext = FiltrationContext(
+      sparkContext.broadcast(cns),
+      pointsDS,
+      sparkContext.broadcast(pointsCloud),
+      config
+    )
 
     val simplex =
-      Simplex(index = SimplexIndex(3L, context.indexPadding), dim = simplexDim, radius = 1.4142135f)
+      Simplex(
+        index = SimplexIndex(BigInt(3), context.indexPadding),
+        dim = 2.toByte,
+        radius = 1.4142135f
+      )
     val iterator = simplex.getFacets
 
     val facets = iterator.toList
     val expectedFacets = List(
-      Simplex(SimplexIndex(2L, context.indexPadding), 1.toByte, 1.4142135f),
-      Simplex(SimplexIndex(4L, context.indexPadding), 1.toByte, 1.0f),
-      Simplex(SimplexIndex(5L, context.indexPadding), 1.toByte, 1.0f)
+      Simplex(SimplexIndex(BigInt(2), context.indexPadding), 1.toByte, 1.4142135f),
+      Simplex(SimplexIndex(BigInt(4), context.indexPadding), 1.toByte, 1.0f),
+      Simplex(SimplexIndex(BigInt(5), context.indexPadding), 1.toByte, 1.0f)
     )
     assert(facets === expectedFacets)
   }
@@ -53,8 +49,6 @@ class SimplexSpec extends AnyFlatSpec with SharedSparkContext {
   behavior of "getCofacets"
 
   it should "return cofacets ordered by CNS index in descending order" in {
-    val distanceCalculator = DistanceCalculator.EuclideanDistanceCalculator
-
     val pointsCloud5 = Array(
       Array(0.0f, 0.0f),
       Array(1.0f, 0.0f),
@@ -62,41 +56,31 @@ class SimplexSpec extends AnyFlatSpec with SharedSparkContext {
       Array(1.0f, 1.0f),
       Array(10.0f, 10.0f)
     )
-    val cns              = CombinatorialNumberSystem(5, 5)
-    val simplexDim: Byte = 1 // combination size 2
+    val pointsDS = spark.createDataset(pointsCloud5)
+    val config   = FiltrationConfig.VietorisRips(distanceThreshold = Some(15.0f))
+    val cns      = CombinatorialNumberSystem(5, 5)
 
-    implicit val context =
-      FiltrationContext(
-        sparkContext.broadcast(cns),
-        sparkContext.broadcast(pointsCloud5),
-        distanceCalculator,
-        Float.PositiveInfinity
-      )
-
-    // Simplex [1, 0] (index 0)
-    // Cofacets with points 2, 3, 4
-    // Point 4 -> [4, 1, 0] (index 4) radius = 14.14...
-    // Point 3 -> [3, 1, 0] (index 1) radius = 1.414...
-    // Point 2 -> [2, 1, 0] (index 0) radius = 1.414...
-    // They should be ordered by CNS index descending, so 4, 1, then 0.
+    implicit val context: FiltrationContext = FiltrationContext(
+      sparkContext.broadcast(cns),
+      pointsDS,
+      sparkContext.broadcast(pointsCloud5),
+      config
+    )
 
     val simplex =
-      Simplex(index = SimplexIndex(0L, context.indexPadding), dim = simplexDim, radius = 1.0f)
+      Simplex(index = SimplexIndex(BigInt(0), context.indexPadding), dim = 1.toByte, radius = 1.0f)
     val iterator = simplex.getCofacets
 
     val cofacets = iterator.toList
     val expectedCofacets = List(
-      Simplex(SimplexIndex(4L, context.indexPadding), 2.toByte, 14.142136f),
-      Simplex(SimplexIndex(1L, context.indexPadding), 2.toByte, 1.4142135f),
-      Simplex(SimplexIndex(0L, context.indexPadding), 2.toByte, 1.4142135f)
+      Simplex(SimplexIndex(BigInt(4), context.indexPadding), 2.toByte, 14.142136f),
+      Simplex(SimplexIndex(BigInt(1), context.indexPadding), 2.toByte, 1.4142135f),
+      Simplex(SimplexIndex(BigInt(0), context.indexPadding), 2.toByte, 1.4142135f)
     )
     assert(cofacets === expectedCofacets)
   }
 
   it should "not return cofacets with radius exceeding distanceThreshold" in {
-    val distanceCalculator = DistanceCalculator.EuclideanDistanceCalculator
-
-    // Let's add a point 4: Array(10.0f, 10.0f)
     val pointsCloud5 = Array(
       Array(0.0f, 0.0f),
       Array(1.0f, 0.0f),
@@ -104,28 +88,29 @@ class SimplexSpec extends AnyFlatSpec with SharedSparkContext {
       Array(1.0f, 1.0f),
       Array(10.0f, 10.0f)
     )
-    val cns              = CombinatorialNumberSystem(5, 5)
-    val simplexDim: Byte = 1 // combination size 2
+    val pointsDS = spark.createDataset(pointsCloud5)
+    val config   = FiltrationConfig.VietorisRips(distanceThreshold = Some(5.0f))
+    val cns      = CombinatorialNumberSystem(5, 5)
 
-    // Set threshold to 5.0f, which is smaller than the distance to point 4 (~14.14f)
-    implicit val context =
-      FiltrationContext(
-        sparkContext.broadcast(cns),
-        sparkContext.broadcast(pointsCloud5),
-        distanceCalculator,
-        5.0f
-      )
+    implicit val context: FiltrationContext = FiltrationContext(
+      sparkContext.broadcast(cns),
+      pointsDS,
+      sparkContext.broadcast(pointsCloud5),
+      config
+    )
 
     val simplex =
-      Simplex(index = SimplexIndex(0L, context.indexPadding), dim = simplexDim, radius = 1.0f)
+      Simplex(index = SimplexIndex(BigInt(0), context.indexPadding), dim = 1.toByte, radius = 1.0f)
     val iterator = simplex.getCofacets
 
     val cofacets = iterator.toList
-    // Only points 2 and 3 should form cofacets, point 4 is filtered out
     assert(cofacets.length === 2)
 
     val expectedIndices =
-      Set(SimplexIndex(0L, context.indexPadding), SimplexIndex(1L, context.indexPadding))
+      Set(
+        SimplexIndex(BigInt(0), context.indexPadding),
+        SimplexIndex(BigInt(1), context.indexPadding)
+      )
     assert(
       cofacets.map(_.index).toSet === expectedIndices
     )
@@ -139,23 +124,20 @@ class SimplexSpec extends AnyFlatSpec with SharedSparkContext {
       Array(3.0f, 0.0f),
       Array(0.0f, 4.0f)
     )
-    val distanceCalculator = DistanceCalculator.EuclideanDistanceCalculator
-    val cns                = CombinatorialNumberSystem(3, 5)
+    val pointsDS = spark.createDataset(pointsCloud)
+    val config   = FiltrationConfig.VietorisRips(distanceThreshold = Some(5.0f))
+    val cns      = CombinatorialNumberSystem(3, 5)
 
-    implicit val context =
-      FiltrationContext(
-        sparkContext.broadcast(cns),
-        sparkContext.broadcast(pointsCloud),
-        distanceCalculator,
-        Float.PositiveInfinity
-      )
+    implicit val context: FiltrationContext = FiltrationContext(
+      sparkContext.broadcast(cns),
+      pointsDS,
+      sparkContext.broadcast(pointsCloud),
+      config
+    )
 
-    // Let's take simplex with vertices [2, 1, 0] (index 0)
-    // Vertices are: (0,0), (3,0), (0,4)
-    // Distances are: 3.0, 4.0, 5.0. Max distance is 5.0f
-    val simplex = Simplex(BigInt(0L), 2.toByte)
+    val simplex = Simplex(BigInt(0), 2.toByte)
 
-    assert(simplex.index === SimplexIndex(0L, context.indexPadding))
+    assert(simplex.index === SimplexIndex(BigInt(0), context.indexPadding))
     assert(simplex.dim === 2.toByte)
     assert(simplex.radius === 5.0f)
   }

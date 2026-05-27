@@ -52,20 +52,17 @@ private[sparkpersistenthomology] case class Simplex(index: SimplexIndex, dim: By
         while (nextSimplex == null && it.hasNext) {
           val (cofacetIndex, addedElement) = it.next()
           val maxDistanceToAddedPoint =
-            computeMaxDistanceFromPointWithThreshold(
+            computeMaxDistanceFromPoint(
               addedElement,
-              simplexCombination,
-              context.distanceThreshold
+              simplexCombination
             )
           val cofacetRadius = math.max(radius, maxDistanceToAddedPoint)
 
-          if (cofacetRadius <= context.distanceThreshold) {
-            nextSimplex = Simplex(
-              SimplexIndex(cofacetIndex, context.indexPadding),
-              (dim + 1).toByte,
-              cofacetRadius
-            )
-          }
+          nextSimplex = Simplex(
+            SimplexIndex(cofacetIndex, context.indexPadding),
+            (dim + 1).toByte,
+            cofacetRadius
+          )
         }
       }
 
@@ -117,7 +114,7 @@ private[sparkpersistenthomology] case class Simplex(index: SimplexIndex, dim: By
     while (it.hasNext && result.isEmpty) {
       val (cofacetIndex, addedElement) = it.next()
       val maxDistanceToAddedPoint =
-        computeMaxDistanceFromPointWithThreshold(addedElement, simplexCombination, radius)
+        computeMaxDistanceFromPoint(addedElement, simplexCombination)
       val cofacetRadius = math.max(radius, maxDistanceToAddedPoint)
 
       if (cofacetRadius == radius) {
@@ -213,18 +210,14 @@ private[sparkpersistenthomology] object Simplex {
     maxDistance
   }
 
-  private[sparkpersistenthomology] def computeMaxDistanceFromPointWithThreshold(
+  private[sparkpersistenthomology] def computeMaxDistanceFromPoint(
     pointIndex: Int,
-    combination: Array[Int],
-    threshold: Float
+    combination: Array[Int]
   )(implicit context: FiltrationContext): Float = {
     var maxDistanceToPoint = 0.0f
     var i                  = 0
     while (i < combination.length) {
       val dist = getDistance(pointIndex, combination(i))
-      if (dist > threshold) {
-        return Float.PositiveInfinity
-      }
       if (dist > maxDistanceToPoint) {
         maxDistanceToPoint = dist
       }
