@@ -1,4 +1,4 @@
-package io.github.jakipatryk.sparkpersistenthomology.internal.vr
+package io.github.jakipatryk.sparkpersistenthomology.internal.flag
 
 import scala.collection.mutable.ArrayBuffer
 

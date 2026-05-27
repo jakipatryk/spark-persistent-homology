@@ -1,4 +1,4 @@
-package io.github.jakipatryk.sparkpersistenthomology.internal.vr
+package io.github.jakipatryk.sparkpersistenthomology.internal.flag
 
 import io.github.jakipatryk.sparkpersistenthomology.distances.DistanceCalculator
 import org.apache.spark.sql.Dataset
@@ -9,7 +9,7 @@ import scala.io.Source
 import scala.util.Random
 import scala.collection.mutable
 
-class VietorisRipsPersistentCohomologySpec extends AnyFlatSpec with SharedSparkContext {
+class FlagFiltrationPersistentCohomologySpec extends AnyFlatSpec with SharedSparkContext {
 
   import spark.implicits._
 
@@ -115,7 +115,7 @@ class VietorisRipsPersistentCohomologySpec extends AnyFlatSpec with SharedSparkC
     val expectedDim1 = loadExpectedPairs("/three_spheres/persistence_pairs_dim_1.csv", 1)
     val expectedDim2 = loadExpectedPairs("/three_spheres/persistence_pairs_dim_2.csv", 2)
 
-    val results = VietorisRipsPersistentCohomology.computePersistencePairs(pointsCloud, maxDim)
+    val results = FlagFiltrationPersistentCohomology.computePersistencePairs(pointsCloud, maxDim)
 
     assert(results.length == 3)
 
@@ -133,7 +133,7 @@ class VietorisRipsPersistentCohomologySpec extends AnyFlatSpec with SharedSparkC
     val expectedDim1 = loadExpectedPairs("/noisy_clusters/persistence_pairs_dim_1.csv", 1)
     val expectedDim2 = loadExpectedPairs("/noisy_clusters/persistence_pairs_dim_2.csv", 2)
 
-    val results = VietorisRipsPersistentCohomology.computePersistencePairs(
+    val results = FlagFiltrationPersistentCohomology.computePersistencePairs(
       pointsCloud,
       maxDim,
       distanceThreshold = threshold
@@ -170,7 +170,7 @@ class VietorisRipsPersistentCohomologySpec extends AnyFlatSpec with SharedSparkC
 
     val pointsCloud = spark.createDataset(points)
     val maxDim      = 1
-    val results     = VietorisRipsPersistentCohomology.computePersistencePairs(pointsCloud, maxDim)
+    val results = FlagFiltrationPersistentCohomology.computePersistencePairs(pointsCloud, maxDim)
 
     val dim1Pairs = results(1).collect()
 
@@ -208,7 +208,7 @@ class VietorisRipsPersistentCohomologySpec extends AnyFlatSpec with SharedSparkC
     val pointsCloud = generateTorusPoints(numPoints)
     val maxDim      = 0
 
-    val results = VietorisRipsPersistentCohomology.computePersistencePairs(pointsCloud, maxDim)
+    val results = FlagFiltrationPersistentCohomology.computePersistencePairs(pointsCloud, maxDim)
 
     val dim0Pairs     = results(0).collect()
     val infinitePairs = dim0Pairs.filter(_.death.isInfinity)

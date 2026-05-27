@@ -1,4 +1,4 @@
-package io.github.jakipatryk.sparkpersistenthomology.internal.vr
+package io.github.jakipatryk.sparkpersistenthomology.internal.flag
 
 import io.github.jakipatryk.sparkpersistenthomology.distances.DistanceCalculator
 import org.apache.spark.sql.Dataset
@@ -6,7 +6,7 @@ import io.github.jakipatryk.sparkpersistenthomology.PersistencePair
 import org.apache.spark.sql.SparkSession
 import io.github.jakipatryk.sparkpersistenthomology.internal.utils.CombinatorialNumberSystem
 
-private[sparkpersistenthomology] object VietorisRipsPersistentCohomology {
+private[sparkpersistenthomology] object FlagFiltrationPersistentCohomology {
 
   def computePersistencePairs(
     pointsCloud: Dataset[Array[Float]],

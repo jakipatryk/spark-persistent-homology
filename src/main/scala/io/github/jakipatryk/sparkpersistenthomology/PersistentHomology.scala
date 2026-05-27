@@ -2,7 +2,7 @@ package io.github.jakipatryk.sparkpersistenthomology
 
 import org.apache.spark.sql.Dataset
 import io.github.jakipatryk.sparkpersistenthomology.distances.DistanceCalculator
-import io.github.jakipatryk.sparkpersistenthomology.internal.vr.VietorisRipsPersistentCohomology
+import io.github.jakipatryk.sparkpersistenthomology.internal.flag.FlagFiltrationPersistentCohomology
 
 object PersistentHomology {
 
@@ -28,7 +28,7 @@ object PersistentHomology {
     distanceThreshold: Option[Float] = None
   ): Array[Dataset[PersistencePair]] = {
     implicit val spark = pointsCloud.sparkSession
-    VietorisRipsPersistentCohomology.computePersistencePairs(
+    FlagFiltrationPersistentCohomology.computePersistencePairs(
       pointsCloud,
       maxDim,
       distanceCalculator,

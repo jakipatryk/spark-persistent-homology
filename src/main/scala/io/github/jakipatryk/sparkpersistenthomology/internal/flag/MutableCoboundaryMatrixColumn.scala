@@ -1,4 +1,4 @@
-package io.github.jakipatryk.sparkpersistenthomology.internal.vr
+package io.github.jakipatryk.sparkpersistenthomology.internal.flag
 
 import io.github.jakipatryk.sparkpersistenthomology.internal.utils.LazyModulo2SortedArrayPriorityQueue
 
@@ -47,7 +47,7 @@ private[sparkpersistenthomology] class MutableCoboundaryMatrixColumn(
 
 }
 
-private[vr] object MutableCoboundaryMatrixColumn {
+private[sparkpersistenthomology] object MutableCoboundaryMatrixColumn {
 
   def apply(
     col: CoboundaryMatrixColumn

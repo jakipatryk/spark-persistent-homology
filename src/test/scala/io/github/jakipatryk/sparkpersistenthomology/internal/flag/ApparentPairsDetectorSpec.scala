@@ -1,4 +1,4 @@
-package io.github.jakipatryk.sparkpersistenthomology.internal.vr
+package io.github.jakipatryk.sparkpersistenthomology.internal.flag
 
 import org.scalatest.flatspec.AnyFlatSpec
 import io.github.jakipatryk.sparkpersistenthomology.SharedSparkContext

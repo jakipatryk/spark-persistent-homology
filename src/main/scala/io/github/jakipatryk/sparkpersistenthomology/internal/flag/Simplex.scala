@@ -1,4 +1,4 @@
-package io.github.jakipatryk.sparkpersistenthomology.internal.vr
+package io.github.jakipatryk.sparkpersistenthomology.internal.flag
 
 private[sparkpersistenthomology] case class Simplex(index: SimplexIndex, dim: Byte, radius: Float) {
 
