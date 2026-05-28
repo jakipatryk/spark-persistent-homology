@@ -75,4 +75,107 @@ class SparseDistanceMatrixSpec extends AnyFlatSpec with Matchers with SharedSpar
     matrix.neighbors(1) shouldBe Array(0)
     matrix.neighbors(2) shouldBe Array.empty[Int]
   }
+
+  it should "correctly construct mutual k-nearest neighbors matrix (k=1)" in {
+    val points = Array(
+      Array(0.0f, 0.0f), // 0
+      Array(0.0f, 1.0f), // 1
+      Array(0.0f, 3.0f), // 2
+      Array(0.0f, 6.0f)  // 3
+    )
+    val pointsBroadcast = spark.sparkContext.broadcast(points)
+    val config          = FiltrationConfig.NearestNeighbors(k = 1)
+
+    val matrix = SparseDistanceMatrix(
+      config,
+      spark.createDataset(points),
+      pointsBroadcast
+    )
+
+    // kNN(0) = {1}, kNN(1) = {0} -> mutual
+    // kNN(2) = {1}, kNN(3) = {2} -> not mutual with 1 and 2 respectively
+    matrix.neighbors(0) shouldBe Array(1)
+    matrix.neighbors(1) shouldBe Array(0)
+    matrix.neighbors(2) shouldBe Array.empty[Int]
+    matrix.neighbors(3) shouldBe Array.empty[Int]
+  }
+
+  it should "correctly construct mutual k-nearest neighbors matrix (k=2)" in {
+    val points = Array(
+      Array(0.0f, 0.0f), // 0
+      Array(0.0f, 1.0f), // 1
+      Array(0.0f, 2.5f), // 2
+      Array(0.0f, 6.0f)  // 3
+    )
+    val pointsBroadcast = spark.sparkContext.broadcast(points)
+    val config          = FiltrationConfig.NearestNeighbors(k = 2)
+
+    val matrix = SparseDistanceMatrix(
+      config,
+      spark.createDataset(points),
+      pointsBroadcast
+    )
+
+    // kNN(0) = {1, 2}, kNN(1) = {0, 2}, kNN(2) = {1, 0}, kNN(3) = {2, 1}
+    // mutuals: 0-1, 0-2, 1-2. 3 is not mutual with 1 or 2.
+    matrix.neighbors(0) shouldBe Array(2, 1)
+    matrix.neighbors(1) shouldBe Array(2, 0)
+    matrix.neighbors(2) shouldBe Array(1, 0)
+    matrix.neighbors(3) shouldBe Array.empty[Int]
+  }
+
+  it should "correctly construct mutual k-nearest neighbors matrix (k >= numPoints - 1)" in {
+    val points = Array(
+      Array(0.0f, 0.0f), // 0
+      Array(0.0f, 1.0f), // 1
+      Array(0.0f, 2.5f)  // 2
+    )
+    val pointsBroadcast = spark.sparkContext.broadcast(points)
+    val config          = FiltrationConfig.NearestNeighbors(k = 10)
+
+    val matrix = SparseDistanceMatrix(
+      config,
+      spark.createDataset(points),
+      pointsBroadcast
+    )
+
+    // All pairs should be connected, sorted descending
+    matrix.neighbors(0) shouldBe Array(2, 1)
+    matrix.neighbors(1) shouldBe Array(2, 0)
+    matrix.neighbors(2) shouldBe Array(1, 0)
+  }
+
+  it should "correctly enforce symmetrization for k=5 on a larger set of points" in {
+    val points = Array(
+      Array(0.0f, 0.0f),  // 0
+      Array(0.0f, 1.0f),  // 1
+      Array(0.0f, 2.0f),  // 2
+      Array(0.0f, 3.0f),  // 3
+      Array(0.0f, 4.0f),  // 4
+      Array(0.0f, 5.0f),  // 5
+      Array(0.0f, 20.0f), // 6
+      Array(0.0f, 21.0f), // 7
+      Array(0.0f, 22.0f), // 8
+      Array(0.0f, 23.0f)  // 9
+    )
+    val pointsBroadcast = spark.sparkContext.broadcast(points)
+    val config          = FiltrationConfig.NearestNeighbors(k = 5)
+
+    val matrix = SparseDistanceMatrix(
+      config,
+      spark.createDataset(points),
+      pointsBroadcast
+    )
+
+    // Points 0-5 are dense, points 6-9 are dense.
+    // For point 6, its 5 nearest neighbors are 7, 8, 9, 5, 4.
+    // But for point 5, its 5 nearest neighbors are 4, 3, 2, 1, 0.
+    // Point 5's distances: to 4(1.0), to 3(2.0), to 2(3.0), to 1(4.0), to 0(5.0), to 6(15.0).
+    // So 6 is NOT in 5's kNN.
+    // Hence, the edge between 5 and 6 should be removed by symmetrization.
+
+    matrix.neighbors(5) should not contain 6
+    matrix.neighbors(6) should not contain 5
+    matrix.neighbors(6) should contain allOf (7, 8, 9)
+  }
 }

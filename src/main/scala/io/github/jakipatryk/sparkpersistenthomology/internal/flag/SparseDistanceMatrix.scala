@@ -145,6 +145,82 @@ private[sparkpersistenthomology] object SparseDistanceMatrix {
     pointsCloud: Broadcast[Array[Array[Float]]],
     config: FiltrationConfig.NearestNeighbors
   )(implicit spark: SparkSession): SparseDistanceMatrix = {
-    ???
+    val numPoints = pointsCloud.value.length
+
+    if (numPoints <= 1 || config.k <= 0) {
+      val emptyNeighbors = new Array[Array[Int]](numPoints)
+      val emptyDistances = new Array[Array[Float]](numPoints)
+      for (i <- 0 until numPoints) {
+        emptyNeighbors(i) = Array.empty[Int]
+        emptyDistances(i) = Array.empty[Float]
+      }
+      return SparseDistanceMatrix(emptyNeighbors, emptyDistances)
+    }
+
+    val k = math.min(config.k, numPoints - 1)
+
+    val collectedNeighbors = spark.sparkContext
+      .parallelize(0 until numPoints)
+      .mapPartitions { iter =>
+        val points = pointsCloud.value
+        iter.map { i =>
+          val pointI = points(i)
+
+          // Max-heap to keep the k closest points
+          val pq = new java.util.PriorityQueue[(Float, Int)](
+            k + 1,
+            new java.util.Comparator[(Float, Int)] {
+              def compare(a: (Float, Int), b: (Float, Int)): Int =
+                java.lang.Float.compare(b._1, a._1)
+            }
+          )
+
+          var j = 0
+          while (j < numPoints) {
+            if (i != j) {
+              val dist = config.distanceCalculator.calculateDistance(pointI, points(j))
+              pq.offer((dist, j))
+              if (pq.size() > k) {
+                pq.poll()
+              }
+            }
+            j += 1
+          }
+
+          val nbs   = new Array[Int](pq.size())
+          val dists = new Array[Float](pq.size())
+          var idx   = pq.size() - 1
+          while (!pq.isEmpty) {
+            val item = pq.poll()
+            nbs(idx) = item._2
+            dists(idx) = item._1
+            idx -= 1
+          }
+
+          (i, nbs, dists)
+        }
+      }
+      .collect()
+
+    val knnNeighbors = new Array[Set[Int]](numPoints)
+    val knnDistances = new Array[Map[Int, Float]](numPoints)
+
+    for ((i, nbs, dists) <- collectedNeighbors) {
+      knnNeighbors(i) = nbs.toSet
+      knnDistances(i) = nbs.zip(dists).toMap
+    }
+
+    val finalNeighbors = new Array[Array[Int]](numPoints)
+    val finalDistances = new Array[Array[Float]](numPoints)
+
+    for (i <- 0 until numPoints) {
+      val nbs    = knnNeighbors(i)
+      val mutual = nbs.filter(j => knnNeighbors(j).contains(i)).toArray.sorted(Ordering.Int.reverse)
+      val mutualDists = mutual.map(j => knnDistances(i)(j))
+      finalNeighbors(i) = mutual
+      finalDistances(i) = mutualDists
+    }
+
+    SparseDistanceMatrix(finalNeighbors, finalDistances)
   }
 }
