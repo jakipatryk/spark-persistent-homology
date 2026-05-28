@@ -99,6 +99,7 @@ mise exec -- sbt test
 - [Persistence Images: A Stable Vector Representation of Persistent Homology](https://jmlr.org/papers/v18/16-337.html)
 - [GPU-Accelerated Computation of Vietoris-Rips Persistence Barcodes](https://arxiv.org/abs/2003.07989)
 - [Keeping it sparse: Computing Persistent Homology revisited](https://arxiv.org/abs/2211.09075)
+- [Persistent Homology with k-nearest-neighbor Filtrations reveals Topological Convergence of PageRank](https://arxiv.org/abs/2206.04725)
 
 ## License
 
