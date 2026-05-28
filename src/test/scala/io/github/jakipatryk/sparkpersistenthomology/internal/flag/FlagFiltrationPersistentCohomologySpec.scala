@@ -235,4 +235,68 @@ class FlagFiltrationPersistentCohomologySpec extends AnyFlatSpec with SharedSpar
     )
   }
 
+  it should "compute persistence pairs correctly for a simple point cloud using NearestNeighbors filtration" in {
+    // A simple graph of two separated triangles:
+    // T1: (0,0), (0,1), (1,0)
+    // T2: (10,10), (10,11), (11,10)
+    val points = Seq(
+      Array(0.0f, 0.0f),
+      Array(0.0f, 1.0f),
+      Array(1.0f, 0.0f),
+      Array(10.0f, 10.0f),
+      Array(10.0f, 11.0f),
+      Array(11.0f, 10.0f)
+    )
+    val pointsCloud = spark.createDataset(points)
+
+    // With k=2, each point in a triangle has 2 neighbors within the same triangle.
+    // So the graph splits into exactly 2 disconnected components (the two triangles).
+    // The max distance within a triangle is sqrt(2) ~ 1.414.
+    // The points between triangles are far apart and won't be in each other's kNN.
+    val results = FlagFiltrationPersistentCohomology.computePersistencePairs(
+      pointsCloud,
+      maxDim = 1,
+      FiltrationConfig.NearestNeighbors(k = 2)
+    )
+
+    val dim0Pairs     = results(0).collect()
+    val infinitePairs = dim0Pairs.filter(_.death.isInfinity)
+
+    assert(
+      infinitePairs.length == 2,
+      s"Expected exactly 2 infinite persistence pairs (2 components) in dim 0 for kNN, but got ${infinitePairs.length}"
+    )
+
+    // Inside each component (a triangle), with mutual kNN k=2, it becomes a fully connected 3-clique.
+    // A solid triangle has trivial 1-homology. So dim 1 should be empty (no cycles).
+
+    val dim1Pairs = results(1).collect()
+    assert(
+      dim1Pairs.isEmpty,
+      s"Expected 0 persistence pairs in dim 1 for this kNN setup, but got ${dim1Pairs.length}"
+    )
+  }
+
+  it should "find exactly one infinite persistence pair in dim 0 for 2000 points on a torus using NearestNeighbors filtration" in {
+    val numPoints   = 2000
+    val pointsCloud = generateTorusPoints(numPoints)
+    val maxDim      = 0
+
+    // Using a sufficiently large k (e.g., 40) ensures that even with the strictness
+    // of mutual kNN, the entire dense Torus forms a single connected component.
+    val results = FlagFiltrationPersistentCohomology.computePersistencePairs(
+      pointsCloud,
+      maxDim,
+      FiltrationConfig.NearestNeighbors(k = 40)
+    )
+
+    val dim0Pairs     = results(0).collect()
+    val infinitePairs = dim0Pairs.filter(_.death.isInfinity)
+
+    assert(
+      infinitePairs.length == 1,
+      s"Expected exactly 1 infinite persistence pair in dim 0 for kNN on Torus, but got ${infinitePairs.length}. Total dim 0 pairs: ${dim0Pairs.length}"
+    )
+  }
+
 }
