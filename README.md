@@ -6,6 +6,7 @@ The goal of this project is to enable persistent homology computation in the con
 
 ## Features
 - **Vietoris-Rips Persistent (Co)Homology:** Computes persistence pairs for Vietoris-Rips filtration. The algorithm is inspired by [Ripser](https://github.com/Ripser/ripser) and [Ripser++](https://github.com/simonzhang00/ripser-plusplus) - it uses apparent pair optimization, clearing optimization, but bunch of things have been changed due to distributed nature of computation in this library, for example locally-exhaustive reduction and compress optimization with apparent pairs have been implemented, and matrix representation is only semi-implicit.  
+- **Mutual k-Nearest Neighbors Persistent (Co)Homology:** Computes persistence pairs using mutual k-Nearest Neighbors distance graph as the underlying filtration. The algorithm used is pretty much the same as for Vietoris-Rips.
 - **Persistence Images:** Support for generating [Persistence Images](https://jmlr.org/papers/v18/16-337.html), a stable vector representation of persistent homology suitable for machine learning or data drift detection.
 
 ## API Usage
@@ -15,15 +16,21 @@ The goal of this project is to enable persistent homology computation in the con
 The main entry point is `PersistentHomology.computePersistentHomology`.
 
 ```scala
-import io.github.jakipatryk.sparkpersistenthomology.PersistentHomology
+import io.github.jakipatryk.sparkpersistenthomology.{PersistentHomology, FiltrationConfig}
 import org.apache.spark.sql.Dataset
 
 val pointsCloud: Dataset[Array[Float]] = ... // Your Spark Dataset of points
 
 val maxDim = 2
+
+// You can use Vietoris-Rips or NearestNeighbors filtration config:
+val config = FiltrationConfig.VietorisRips()
+// val config = FiltrationConfig.NearestNeighbors(k = 10)
+
 val persistencePairsArray = PersistentHomology.computePersistentHomology(
   pointsCloud,
-  maxDim = maxDim
+  maxDim = maxDim,
+  filtrationConfig = config
 )
 
 // persistencePairsArray(i) contains a Dataset[PersistencePair] for dimension i
