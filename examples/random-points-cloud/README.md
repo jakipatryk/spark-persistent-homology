@@ -15,6 +15,7 @@ sbt assembly
 - `--numberOfPoints` - number of points in the generated random points cloud, by default `50`
 - `--dim` - dimension of points in the generated random points cloud, by default `8`
 - `--maxHomologyDim` - max dimension of homology to compute, by default `3`
+- `--k` - number of nearest neighbors for mutual k-NN filtration. If not specified, Vietoris-Rips filtration is used.
 - `--computePersistenceImage` - should the last step of the job be persistence image or just persistence pairs, by default `false`
 
 ### Example of spark-submit
