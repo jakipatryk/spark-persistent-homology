@@ -9,7 +9,7 @@ import org.apache.spark.ml.linalg.DenseMatrix
 import org.apache.spark.sql.Dataset
 import org.apache.spark.sql.functions._
 
-case class PersistenceImage private (
+case class PersistenceImage private[sparkpersistenthomology] (
   image: DenseMatrix,
   birthBound: PersistenceImage.ImageBound,
   persistenceBound: PersistenceImage.ImageBound
