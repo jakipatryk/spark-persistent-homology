@@ -72,6 +72,11 @@ private[sparkpersistenthomology] case class SparseDistanceMatrix(
 
 private[sparkpersistenthomology] object SparseDistanceMatrix {
 
+  private[flag] case class KnnNode(vertex: Int, neighbors: Array[Int], distances: Array[Float])
+  private[flag] case class UndirectedEdge(node1: Int, node2: Int)
+  private[flag] case class EdgeOccurrence(count: Int, distance: Float)
+  private[flag] case class DirectedEdge(to: Int, distance: Float)
+
   def apply(
     config: FiltrationConfig,
     pointsCloudDS: Dataset[Array[Float]],
@@ -148,19 +153,37 @@ private[sparkpersistenthomology] object SparseDistanceMatrix {
     val numPoints = pointsCloud.value.length
 
     if (numPoints <= 1 || config.k <= 0) {
-      val emptyNeighbors = new Array[Array[Int]](numPoints)
-      val emptyDistances = new Array[Array[Float]](numPoints)
-      for (i <- 0 until numPoints) {
-        emptyNeighbors(i) = Array.empty[Int]
-        emptyDistances(i) = Array.empty[Float]
-      }
-      return SparseDistanceMatrix(emptyNeighbors, emptyDistances)
+      return createEmptyMatrix(numPoints)
     }
 
     val k = math.min(config.k, numPoints - 1)
 
-    val collectedNeighbors = spark.sparkContext
-      .parallelize(0 until numPoints)
+    val asymmetricKnn      = computeAsymmetricKnn(pointsCloud, config, numPoints, k)
+    val mutualKnn          = computeMutualKnnEdges(asymmetricKnn)
+    val collectedNeighbors = mutualKnn.collect()
+
+    assembleSparseMatrix(collectedNeighbors, numPoints)
+  }
+
+  private def createEmptyMatrix(numPoints: Int): SparseDistanceMatrix = {
+    val emptyNeighbors = new Array[Array[Int]](numPoints)
+    val emptyDistances = new Array[Array[Float]](numPoints)
+    for (i <- 0 until numPoints) {
+      emptyNeighbors(i) = Array.empty[Int]
+      emptyDistances(i) = Array.empty[Float]
+    }
+    SparseDistanceMatrix(emptyNeighbors, emptyDistances)
+  }
+
+  private def computeAsymmetricKnn(
+    pointsCloud: Broadcast[Array[Array[Float]]],
+    config: FiltrationConfig.NearestNeighbors,
+    numPoints: Int,
+    k: Int
+  )(implicit spark: SparkSession): Dataset[KnnNode] = {
+    import spark.implicits._
+    spark
+      .createDataset(0 until numPoints)
       .mapPartitions { iter =>
         val points = pointsCloud.value
         iter.map { i =>
@@ -197,28 +220,65 @@ private[sparkpersistenthomology] object SparseDistanceMatrix {
             idx -= 1
           }
 
-          (i, nbs, dists)
+          KnnNode(i, nbs, dists)
         }
       }
-      .collect()
+  }
 
-    val knnNeighbors = new Array[Set[Int]](numPoints)
-    val knnDistances = new Array[Map[Int, Float]](numPoints)
-
-    for ((i, nbs, dists) <- collectedNeighbors) {
-      knnNeighbors(i) = nbs.toSet
-      knnDistances(i) = nbs.zip(dists).toMap
+  private def computeMutualKnnEdges(
+    asymmetricKnn: Dataset[KnnNode]
+  )(implicit spark: SparkSession): Dataset[KnnNode] = {
+    import spark.implicits._
+    asymmetricKnn.flatMap { knnNode =>
+      val res = new Array[(UndirectedEdge, EdgeOccurrence)](knnNode.neighbors.length)
+      var idx = 0
+      while (idx < knnNode.neighbors.length) {
+        val j       = knnNode.neighbors(idx)
+        val d       = knnNode.distances(idx)
+        val minNode = if (knnNode.vertex < j) knnNode.vertex else j
+        val maxNode = if (knnNode.vertex > j) knnNode.vertex else j
+        res(idx) = (UndirectedEdge(minNode, maxNode), EdgeOccurrence(1, d))
+        idx += 1
+      }
+      res
     }
+      .groupByKey(_._1)
+      .reduceGroups { (a: (UndirectedEdge, EdgeOccurrence), b: (UndirectedEdge, EdgeOccurrence)) =>
+        (a._1, EdgeOccurrence(a._2.count + b._2.count, a._2.distance))
+      }
+      .map(_._2)
+      .filter(_._2.count == 2)
+      .flatMap { case (edge, occurrence) =>
+        Iterator(
+          (edge.node1, DirectedEdge(edge.node2, occurrence.distance)),
+          (edge.node2, DirectedEdge(edge.node1, occurrence.distance))
+        )
+      }
+      .groupByKey(_._1)
+      .mapGroups { (vertex: Int, iter: Iterator[(Int, DirectedEdge)]) =>
+        val neighbors       = iter.map(_._2).toArray
+        val sortedNeighbors = neighbors.sortBy(-_.to)
+        val nbs             = sortedNeighbors.map(_.to)
+        val dists           = sortedNeighbors.map(_.distance)
+        KnnNode(vertex, nbs, dists)
+      }
+  }
 
+  private def assembleSparseMatrix(
+    collectedNeighbors: Array[KnnNode],
+    numPoints: Int
+  ): SparseDistanceMatrix = {
     val finalNeighbors = new Array[Array[Int]](numPoints)
     val finalDistances = new Array[Array[Float]](numPoints)
 
     for (i <- 0 until numPoints) {
-      val nbs    = knnNeighbors(i)
-      val mutual = nbs.filter(j => knnNeighbors(j).contains(i)).toArray.sorted(Ordering.Int.reverse)
-      val mutualDists = mutual.map(j => knnDistances(i)(j))
-      finalNeighbors(i) = mutual
-      finalDistances(i) = mutualDists
+      finalNeighbors(i) = Array.empty[Int]
+      finalDistances(i) = Array.empty[Float]
+    }
+
+    for (knnNode <- collectedNeighbors) {
+      finalNeighbors(knnNode.vertex) = knnNode.neighbors
+      finalDistances(knnNode.vertex) = knnNode.distances
     }
 
     SparseDistanceMatrix(finalNeighbors, finalDistances)
