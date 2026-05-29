@@ -1,4 +1,4 @@
-package io.github.jakipatryk.sparkpersistenthomology.internal.vr
+package io.github.jakipatryk.sparkpersistenthomology.internal.flag
 
 import org.apache.spark.sql.{ Dataset, SparkSession }
 
@@ -29,9 +29,8 @@ private[sparkpersistenthomology] object CoboundaryMatrixConstructor {
 
     filteredRange.mapPartitions { iter =>
       iter.flatMap { index =>
-        val simplex = Simplex(index, dim)
-        val shouldKeepTheSimplex = simplex.radius <= context.distanceThreshold &&
-          !ApparentPairsDetector.isInZeroApparentPair(simplex)
+        val simplex              = Simplex(index, dim)
+        val shouldKeepTheSimplex = !ApparentPairsDetector.isInZeroApparentPair(simplex)
 
         if (shouldKeepTheSimplex) {
           Some(CoboundaryMatrixColumn(simplex))

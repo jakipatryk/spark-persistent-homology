@@ -12,6 +12,7 @@ All main classes accept the following arguments:
 - `--case <case-name>` (Required)
 - `--outputPath <path>` (Optional): location to save the resulting persistence pairs as CSV.
 - `--pointsCloudOutputPath <path>` (Optional): location to save the generated points cloud as CSV.
+- `--k <number>` (Optional): number of nearest neighbors for mutual k-NN filtration. If not specified, Vietoris-Rips filtration is used.
 
 ### 1. Torus2D
 **Main Class**: `Torus2D`

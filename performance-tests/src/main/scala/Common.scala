@@ -5,7 +5,8 @@ case class Config(
                    caseName: String = "",
                    inputPath: Option[String] = None,
                    outputPath: Option[String] = None,
-                   pointsCloudOutputPath: Option[String] = None
+                   pointsCloudOutputPath: Option[String] = None,
+                   k: Option[Int] = None
                  )
 
 object Config {
@@ -28,7 +29,10 @@ object Config {
         .text("location where the output persistence pairs should be saved as CSV"),
       opt[String]("pointsCloudOutputPath")
         .action((x, c) => c.copy(pointsCloudOutputPath = Some(x)))
-        .text("location where the generated points cloud should be saved as CSV")
+        .text("location where the generated points cloud should be saved as CSV"),
+      opt[Int]("k")
+        .action((x, c) => c.copy(k = Some(x)))
+        .text("number of nearest neighbors for mutual k-NN filtration. If not specified, Vietoris-Rips filtration is used.")
     )
   }
 

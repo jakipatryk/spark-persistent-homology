@@ -1,4 +1,4 @@
-import io.github.jakipatryk.sparkpersistenthomology.PersistentHomology
+import io.github.jakipatryk.sparkpersistenthomology.{FiltrationConfig, PersistentHomology}
 import org.apache.spark.SparkConf
 import org.apache.spark.sql.{Dataset, SparkSession}
 import scopt.OParser
@@ -24,10 +24,15 @@ object Sphere10D100D {
 
         config.pointsCloudOutputPath.foreach(path => Utils.savePointsCloud(pointsCloud, path))
 
+        val filtrationConfig = config.k match {
+          case Some(kVal) => FiltrationConfig.NearestNeighbors(k = kVal)
+          case None => FiltrationConfig.VietorisRips(distanceThreshold = threshold)
+        }
+
         val persistencePairsArray = PersistentHomology.computePersistentHomology(
           pointsCloud,
           maxDim = 2,
-          distanceThreshold = threshold
+          filtrationConfig = filtrationConfig
         )
 
         config.outputPath match {

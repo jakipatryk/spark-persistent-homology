@@ -6,6 +6,7 @@ The goal of this project is to enable persistent homology computation in the con
 
 ## Features
 - **Vietoris-Rips Persistent (Co)Homology:** Computes persistence pairs for Vietoris-Rips filtration. The algorithm is inspired by [Ripser](https://github.com/Ripser/ripser) and [Ripser++](https://github.com/simonzhang00/ripser-plusplus) - it uses apparent pair optimization, clearing optimization, but bunch of things have been changed due to distributed nature of computation in this library, for example locally-exhaustive reduction and compress optimization with apparent pairs have been implemented, and matrix representation is only semi-implicit.  
+- **Mutual k-Nearest Neighbors Persistent (Co)Homology:** Computes persistence pairs using mutual k-Nearest Neighbors distance graph as the underlying filtration. The algorithm used is pretty much the same as for Vietoris-Rips.
 - **Persistence Images:** Support for generating [Persistence Images](https://jmlr.org/papers/v18/16-337.html), a stable vector representation of persistent homology suitable for machine learning or data drift detection.
 
 ## API Usage
@@ -15,15 +16,21 @@ The goal of this project is to enable persistent homology computation in the con
 The main entry point is `PersistentHomology.computePersistentHomology`.
 
 ```scala
-import io.github.jakipatryk.sparkpersistenthomology.PersistentHomology
+import io.github.jakipatryk.sparkpersistenthomology.{PersistentHomology, FiltrationConfig}
 import org.apache.spark.sql.Dataset
 
 val pointsCloud: Dataset[Array[Float]] = ... // Your Spark Dataset of points
 
 val maxDim = 2
+
+// You can use Vietoris-Rips or NearestNeighbors filtration config:
+val config = FiltrationConfig.VietorisRips()
+// val config = FiltrationConfig.NearestNeighbors(k = 10)
+
 val persistencePairsArray = PersistentHomology.computePersistentHomology(
   pointsCloud,
-  maxDim = maxDim
+  maxDim = maxDim,
+  filtrationConfig = config
 )
 
 // persistencePairsArray(i) contains a Dataset[PersistencePair] for dimension i
@@ -57,12 +64,12 @@ val imageMatrix = computedImage.image // DenseMatrix from Spark ML
 
 The library provides several configuration properties that can be set in the `SparkConf` or via `--conf` flag when submitting a Spark job.
 
-#### Vietoris-Rips Coboundary Matrix Reduction
+#### Coboundary Matrix Reduction
 
 The coboundary matrix reduction is performed in two phases within a loop. You can tune the number of partitions for each phase to optimize performance:
 
-- `spark.persistenthomology.vr.reducer.explicit.partitions`: Number of partitions for the **Explicit Matrix Exhaustive Reduction** phase. This phase clusters columns with the same pivot into the same partition. It is recommended to set this value **relatively low** (e.g., 10-50) to maximize the effectiveness of local reductions within partitions. (Default: `10`)
-- `spark.persistenthomology.vr.reducer.apparent.partitions`: Number of partitions for the **Apparent Pair Shallow Matrix Reduction** phase. This phase performs reductions that are local to each column (using the apparent pairs optimization). It is recommended to set this value **high** to maximize parallelism across the cluster. (Default: `200`)
+- `spark.persistenthomology.reducer.explicit.partitions`: Number of partitions for the **Explicit Matrix Exhaustive Reduction** phase. This phase clusters columns with the same pivot into the same partition. It is recommended to set this value **relatively low** (e.g., 10-50) to maximize the effectiveness of local reductions within partitions. (Default: `10`)
+- `spark.persistenthomology.reducer.apparent.partitions`: Number of partitions for the **Apparent Pair Shallow Matrix Reduction** phase. This phase performs reductions that are local to each column (using the apparent pairs optimization). It is recommended to set this value **high** to maximize parallelism across the cluster. (Default: `200`)
 
 ## Installation
 
@@ -92,6 +99,7 @@ mise exec -- sbt test
 - [Persistence Images: A Stable Vector Representation of Persistent Homology](https://jmlr.org/papers/v18/16-337.html)
 - [GPU-Accelerated Computation of Vietoris-Rips Persistence Barcodes](https://arxiv.org/abs/2003.07989)
 - [Keeping it sparse: Computing Persistent Homology revisited](https://arxiv.org/abs/2211.09075)
+- [Persistent Homology with k-nearest-neighbor Filtrations reveals Topological Convergence of PageRank](https://arxiv.org/abs/2206.04725)
 
 ## License
 

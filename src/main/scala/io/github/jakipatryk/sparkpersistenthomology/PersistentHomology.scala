@@ -1,8 +1,7 @@
 package io.github.jakipatryk.sparkpersistenthomology
 
 import org.apache.spark.sql.Dataset
-import io.github.jakipatryk.sparkpersistenthomology.distances.DistanceCalculator
-import io.github.jakipatryk.sparkpersistenthomology.internal.vr.VietorisRipsPersistentCohomology
+import io.github.jakipatryk.sparkpersistenthomology.internal.flag.FlagFiltrationPersistentCohomology
 
 object PersistentHomology {
 
@@ -12,11 +11,8 @@ object PersistentHomology {
     *   A Spark Dataset where each element is an array of floats representing a point in space.
     * @param maxDim
     *   Maximum dimension of homology to compute (inclusive).
-    * @param distanceCalculator
-    *   The metric used to calculate distances between points. Defaults to Euclidean distance.
-    * @param distanceThreshold
-    *   Optional maximum distance for the filtration. Simplices with a radius larger than this will
-    *   not be included.
+    * @param config
+    *   Configuration for the filtration (e.g., Vietoris-Rips or Nearest-Neighbors).
     * @return
     *   An array of Spark Datasets where each index 'i' contains the persistence pairs for homology
     *   in dimension 'i'.
@@ -24,15 +20,13 @@ object PersistentHomology {
   def computePersistentHomology(
     pointsCloud: Dataset[Array[Float]],
     maxDim: Int,
-    distanceCalculator: DistanceCalculator = DistanceCalculator.EuclideanDistanceCalculator,
-    distanceThreshold: Option[Float] = None
+    config: FiltrationConfig = FiltrationConfig.VietorisRips()
   ): Array[Dataset[PersistencePair]] = {
     implicit val spark = pointsCloud.sparkSession
-    VietorisRipsPersistentCohomology.computePersistencePairs(
+    FlagFiltrationPersistentCohomology.computePersistencePairs(
       pointsCloud,
       maxDim,
-      distanceCalculator,
-      distanceThreshold
+      config
     )
   }
 

@@ -1,11 +1,13 @@
-package io.github.jakipatryk.sparkpersistenthomology.internal.vr
+package io.github.jakipatryk.sparkpersistenthomology.internal.flag
 
 import org.scalatest.flatspec.AnyFlatSpec
 import io.github.jakipatryk.sparkpersistenthomology.SharedSparkContext
-import io.github.jakipatryk.sparkpersistenthomology.distances.DistanceCalculator
+import io.github.jakipatryk.sparkpersistenthomology.FiltrationConfig
 import io.github.jakipatryk.sparkpersistenthomology.internal.utils.CombinatorialNumberSystem
 
 class ApparentPairsDetectorSpec extends AnyFlatSpec with SharedSparkContext {
+
+  import spark.implicits._
 
   behavior of "isInZeroApparentPair"
 
@@ -17,8 +19,8 @@ class ApparentPairsDetectorSpec extends AnyFlatSpec with SharedSparkContext {
     // 2: (0.5, 0)
     // Radii:
     // dist(1, 2) = 1.0 (Longest edge)
-    // dist(0, 1) = sqrt(0.5^2 + 0.1^2) = sqrt(0.26) ≈ 0.51
-    // dist(0, 2) = sqrt(0.5^2 + 0.1^2) = sqrt(0.26) ≈ 0.51
+    // dist(0, 1) = sqrt(0.5^2 + 0.1^2) = sqrt(0.25 + 0.01) = sqrt(0.26) ≈ 0.50990195f
+    // dist(0, 2) = sqrt(0.5^2 + 0.1^2) = sqrt(0.25 + 0.01) = sqrt(0.26) ≈ 0.50990195f
     // Triangle (0, 1, 2) radius = 1.0
 
     val pointsCloud = Array(
@@ -26,8 +28,8 @@ class ApparentPairsDetectorSpec extends AnyFlatSpec with SharedSparkContext {
       Array(-0.5f, 0.0f),
       Array(0.5f, 0.0f)
     )
-    val distanceCalculator = DistanceCalculator.EuclideanDistanceCalculator
-    val distanceThreshold  = 2.0f
+    val pointsDS = spark.createDataset(pointsCloud)
+    val config   = FiltrationConfig.VietorisRips(distanceThreshold = Some(2.0f))
 
     val cns                  = CombinatorialNumberSystem(3, 4)
     val broadcastCns         = sparkContext.broadcast(cns)
@@ -35,9 +37,9 @@ class ApparentPairsDetectorSpec extends AnyFlatSpec with SharedSparkContext {
 
     implicit val context: FiltrationContext = FiltrationContext(
       broadcastCns,
+      pointsDS,
       broadcastPointsCloud,
-      distanceCalculator,
-      distanceThreshold
+      config
     )
 
     // CNS Indices for edges (combinations of size 2):
@@ -45,13 +47,16 @@ class ApparentPairsDetectorSpec extends AnyFlatSpec with SharedSparkContext {
     // {2, 0} -> binom(2, 2) + binom(0, 1) = 1 + 0 = 1
     // {2, 1} -> binom(2, 2) + binom(1, 1) = 1 + 1 = 2
     // Longest edge is {2, 1} with index 2.
-    val edge01 = Simplex(BigInt(0), 1, 0.50990195f) // {1, 0}
-    val edge02 = Simplex(BigInt(1), 1, 0.50990195f) // {2, 0}
-    val edge12 = Simplex(BigInt(2), 1, 1.0f)        // {2, 1}
+    val r01 = 0.50990195f
+    val r12 = 1.0f
+
+    val edge01 = Simplex(SimplexIndex(BigInt(0), context.indexPadding), 1, r01) // {1, 0}
+    val edge02 = Simplex(SimplexIndex(BigInt(1), context.indexPadding), 1, r01) // {2, 0}
+    val edge12 = Simplex(SimplexIndex(BigInt(2), context.indexPadding), 1, r12) // {2, 1}
 
     // CNS Index for triangle (combination of size 3):
     // {2, 1, 0} -> binom(2, 3) + binom(1, 2) + binom(0, 1) = 0 + 0 + 0 = 0
-    val triangle = Simplex(BigInt(0), 2, 1.0f)
+    val triangle = Simplex(SimplexIndex(BigInt(0), context.indexPadding), 2, r12)
 
     // Edge {2, 1} (index 2) and Triangle {2, 1, 0} (index 0) should be an apparent pair
     assert(ApparentPairsDetector.isInZeroApparentPair(edge12))
@@ -80,18 +85,17 @@ class ApparentPairsDetectorSpec extends AnyFlatSpec with SharedSparkContext {
       Array(0.5f, 0.0f),  // 2
       Array(0.0f, -2.0f)  // 3
     )
-    val distanceCalculator = DistanceCalculator.EuclideanDistanceCalculator
-    val distanceThreshold  = 5.0f
+    val pointsDS = spark.createDataset(pointsCloud)
+    val config   = FiltrationConfig.VietorisRips(distanceThreshold = Some(10.0f))
 
-    val cns                  = CombinatorialNumberSystem(4, 4)
-    val broadcastCns         = sparkContext.broadcast(cns)
-    val broadcastPointsCloud = sparkContext.broadcast(pointsCloud)
+    val cns          = CombinatorialNumberSystem(4, 4)
+    val broadcastCns = sparkContext.broadcast(cns)
 
     implicit val context: FiltrationContext = FiltrationContext(
       broadcastCns,
-      broadcastPointsCloud,
-      distanceCalculator,
-      distanceThreshold
+      pointsDS,
+      sparkContext.broadcast(pointsCloud),
+      config
     )
 
     // Edges CNS Indices:

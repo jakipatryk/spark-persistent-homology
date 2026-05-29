@@ -1,4 +1,4 @@
-import io.github.jakipatryk.sparkpersistenthomology.{PersistencePair, PersistentHomology}
+import io.github.jakipatryk.sparkpersistenthomology.{FiltrationConfig, PersistencePair, PersistentHomology}
 import io.github.jakipatryk.sparkpersistenthomology.persistenceimage.{BirthAndPersistenceBoundsConfig, PersistenceImage}
 import org.apache.spark.sql.{Dataset, SparkSession}
 import org.apache.spark.{SparkConf, SparkContext}
@@ -9,6 +9,7 @@ case class Config(
                    numberOfPoints: Int = 50,
                    dim: Int = 8,
                    maxHomologyDim: Int = 3,
+                   k: Option[Int] = None,
                    computePersistenceImage: Boolean = false
                  )
 
@@ -31,6 +32,9 @@ object Config {
       opt[Int]("maxHomologyDim")
         .action((maxDim, c) => c.copy(maxHomologyDim = maxDim))
         .text("max dimension of homology to compute"),
+      opt[Int]('k', "k")
+        .action((kVal, c) => c.copy(k = Some(kVal)))
+        .text("number of nearest neighbors for mutual k-NN filtration. If not specified, Vietoris-Rips filtration is used."),
       opt[Boolean] ("computePersistenceImage")
         .action((computePersistenceImage, c) => c.copy(computePersistenceImage = computePersistenceImage))
         .text("should the last step of the job be persistence image or just persistence pairs")
@@ -59,12 +63,18 @@ object SparkJob {
     val parsedConfig = Config.getConfig(args)
 
     parsedConfig match {
-      case Some(Config(numberOfPoints, dim, maxHomologyDim, computePersistenceImage)) =>
+      case Some(Config(numberOfPoints, dim, maxHomologyDim, k, computePersistenceImage)) =>
         val pointsCloud = generatePointsCloud(dim, numberOfPoints)
+
+        val filtrationConfig = k match {
+          case Some(kVal) => FiltrationConfig.NearestNeighbors(k = kVal)
+          case None => FiltrationConfig.VietorisRips()
+        }
 
         val persistencePairsArray = PersistentHomology.computePersistentHomology(
           pointsCloud,
-          maxDim = maxHomologyDim
+          maxDim = maxHomologyDim,
+          filtrationConfig = filtrationConfig
         )
 
         if(computePersistenceImage) {

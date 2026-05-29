@@ -1,4 +1,4 @@
-package io.github.jakipatryk.sparkpersistenthomology.internal.vr
+package io.github.jakipatryk.sparkpersistenthomology.internal.flag
 
 import org.apache.spark.sql.Dataset
 import org.apache.spark.sql.SparkSession
@@ -24,9 +24,9 @@ private[sparkpersistenthomology] object CoboundaryMatrixReducer {
     var shouldContinueReducing = true
 
     val explicitPartitions =
-      spark.conf.get("spark.persistenthomology.vr.reducer.explicit.partitions", "10").toInt
+      spark.conf.get("spark.persistenthomology.reducer.explicit.partitions", "10").toInt
     val apparentPartitions =
-      spark.conf.get("spark.persistenthomology.vr.reducer.apparent.partitions", "200").toInt
+      spark.conf.get("spark.persistenthomology.reducer.apparent.partitions", "200").toInt
 
     while (shouldContinueReducing) {
       val hasPivotChangedAcc = spark.sparkContext.longAccumulator

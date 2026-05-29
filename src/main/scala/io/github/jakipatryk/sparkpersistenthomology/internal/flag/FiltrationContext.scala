@@ -1,21 +1,18 @@
-package io.github.jakipatryk.sparkpersistenthomology.internal.vr
+package io.github.jakipatryk.sparkpersistenthomology.internal.flag
 
+import org.apache.spark.sql.SparkSession
 import org.apache.spark.broadcast.Broadcast
 import io.github.jakipatryk.sparkpersistenthomology.distances.DistanceCalculator
 import io.github.jakipatryk.sparkpersistenthomology.internal.utils.CombinatorialNumberSystem
+import io.github.jakipatryk.sparkpersistenthomology.FiltrationConfig
+import org.apache.spark.sql.Dataset
 
-/** Context for Vietoris-Rips filtration calculations.
+/** Context for flag filtration calculations.
   *
   * @param cns
   *   Broadcasted Combinatorial Number System for index <-> combination conversions.
-  * @param pointsCloud
-  *   Broadcasted array of points.
   * @param distanceMatrix
   *   Broadcasted sparse distance matrix containing neighbor information.
-  * @param distanceCalculator
-  *   Calculator for point-to-point distances.
-  * @param distanceThreshold
-  *   Maximum distance (radius) for simplices to be included in the filtration.
   * @param indexPadding
   *   Length of the zero-padded string representation for simplex indices. Calculated based on the
   *   maximum possible index in the filtration.
@@ -23,20 +20,18 @@ import io.github.jakipatryk.sparkpersistenthomology.internal.utils.Combinatorial
 private[sparkpersistenthomology] case class FiltrationContext(
   cns: Broadcast[CombinatorialNumberSystem],
   distanceMatrix: Broadcast[SparseDistanceMatrix],
-  distanceCalculator: DistanceCalculator,
-  distanceThreshold: Float,
   indexPadding: Int
 )
 
 private[sparkpersistenthomology] object FiltrationContext {
   def apply(
     cns: Broadcast[CombinatorialNumberSystem],
+    pointsCloudDS: Dataset[Array[Float]],
     pointsCloud: Broadcast[Array[Array[Float]]],
-    distanceCalculator: DistanceCalculator,
-    distanceThreshold: Float
-  )(implicit spark: org.apache.spark.sql.SparkSession): FiltrationContext = {
+    config: FiltrationConfig
+  )(implicit spark: SparkSession): FiltrationContext = {
     val distanceMatrix =
-      SparseDistanceMatrix(pointsCloud, distanceCalculator, distanceThreshold)
+      SparseDistanceMatrix(config, pointsCloudDS, pointsCloud)
     val distanceMatrixBroadcast = spark.sparkContext.broadcast(distanceMatrix)
 
     val maxIndexPadding =
@@ -45,8 +40,6 @@ private[sparkpersistenthomology] object FiltrationContext {
     new FiltrationContext(
       cns,
       distanceMatrixBroadcast,
-      distanceCalculator,
-      distanceThreshold,
       maxIndexPadding
     )
   }

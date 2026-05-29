@@ -1,8 +1,8 @@
-package io.github.jakipatryk.sparkpersistenthomology.internal.vr
+package io.github.jakipatryk.sparkpersistenthomology.internal.flag
 
 import org.scalatest.flatspec.AnyFlatSpec
-import io.github.jakipatryk.sparkpersistenthomology.SharedSparkContext
-import io.github.jakipatryk.sparkpersistenthomology.distances.DistanceCalculator
+import io.github.jakipatryk.sparkpersistenthomology.{ FiltrationConfig, SharedSparkContext }
+import io.github.jakipatryk.sparkpersistenthomology.internal.flag._
 import io.github.jakipatryk.sparkpersistenthomology.internal.utils.CombinatorialNumberSystem
 import org.apache.spark.sql.Dataset
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
@@ -28,20 +28,18 @@ class CoboundaryMatrixReducerSpec
     val dimGen       = Gen.choose(0, 2)
 
     forAll(pointCloudGen, thresholdGen, dimGen) { (pointsCloud, distanceThreshold, dim) =>
-      val distanceCalculator = DistanceCalculator.EuclideanDistanceCalculator
+      val pointsDS = spark.createDataset(pointsCloud)
+      val config   = FiltrationConfig.VietorisRips(distanceThreshold = Some(distanceThreshold))
 
       val numPoints = pointsCloud.length
       val cns       = CombinatorialNumberSystem(numPoints, dim + 3)
 
       implicit val context: FiltrationContext = FiltrationContext(
         sparkContext.broadcast(cns),
+        pointsDS,
         sparkContext.broadcast(pointsCloud),
-        distanceCalculator,
-        distanceThreshold
+        config
       )
-
-      val numSimplicesNextDim =
-        cns.allCombinationsCount(Simplex.dimToCombinationSize((dim + 1).toByte))
 
       // Generate unreduced matrix for dimension `dim`
       val unreducedMatrix = CoboundaryMatrixConstructor.construct(dim.toByte, None)
