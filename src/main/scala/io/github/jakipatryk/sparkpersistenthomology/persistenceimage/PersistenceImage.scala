@@ -43,6 +43,8 @@ object PersistenceImage {
     * @param monteCarloIntegrationSamplesPerPixel
     *   Number of samples used in computing Monte Carlo Integral for each pixel and persistence
     *   pair. The higher number the better image approximation, but slower computation.
+    * @param infinitePairsHandling
+    *   Strategy for handling infinite persistence pairs (those with infinite death).
     * @return
     *   Persistence image with image in the form of DenseMatrix.
     */
@@ -53,13 +55,14 @@ object PersistenceImage {
     numberOfPixelsOnPersistenceAxis: Int,
     influenceDistribution: InfluenceDistribution,
     weightingFunction: WeightingFunction = WeightingFunction.JustPersistenceWeightingFunction,
-    monteCarloIntegrationSamplesPerPixel: Int = 5
+    monteCarloIntegrationSamplesPerPixel: Int = 5,
+    infinitePairsHandling: InfinitePairsHandling = InfinitePairsHandling.Drop
   ): PersistenceImage = {
     validateDimensionsConfig(boundsConfig)
 
-    val finitePairs = persistencePairs.filter(p => !p.death.isPosInfinity)
+    val processedPairs = infinitePairsHandling.handle(persistencePairs)
 
-    val (birthBound, persistenceBound) = resolveBounds(finitePairs, boundsConfig)
+    val (birthBound, persistenceBound) = resolveBounds(processedPairs, boundsConfig)
 
     val birthAxisPixelSize = (birthBound.max - birthBound.min) / numberOfPixelsOnBirthAxis
     val persistenceAxisPixelSize =
@@ -75,7 +78,7 @@ object PersistenceImage {
       )
     } else {
       val aggregator = {
-        import finitePairs.sparkSession.implicits._
+        import processedPairs.sparkSession.implicits._
         new PersistenceImageAggregator(
           numberOfPixelsOnBirthAxis,
           numberOfPixelsOnPersistenceAxis,
@@ -89,7 +92,7 @@ object PersistenceImage {
         )
       }
 
-      val imageMatrix = finitePairs.select(aggregator.toColumn).head()
+      val imageMatrix = processedPairs.select(aggregator.toColumn).head()
 
       PersistenceImage(
         imageMatrix,
@@ -109,7 +112,8 @@ object PersistenceImage {
     numberOfPixelsOnBirthAxis: Int,
     numberOfPixelsOnPersistenceAxis: Int,
     varianceBirthAxis: Double,
-    variancePersistenceAxis: Double
+    variancePersistenceAxis: Double,
+    infinitePairsHandling: InfinitePairsHandling
   ): PersistenceImage =
     fromPersistencePairs(
       persistencePairs,
@@ -119,7 +123,10 @@ object PersistenceImage {
       new InfluenceDistribution.GaussianInfluenceDistribution(
         varianceBirthAxis,
         variancePersistenceAxis
-      )
+      ),
+      monteCarloIntegrationSamplesPerPixel =
+        5, // passing default to allow overriding infinitePairsHandling
+      infinitePairsHandling = infinitePairsHandling
     )
 
   /** Same as [[fromPersistencePairs]], but specifically for Gaussian influence distribution. Takes
@@ -138,14 +145,15 @@ object PersistenceImage {
       numberOfPixelsOnBirthAxis,
       numberOfPixelsOnPersistenceAxis,
       variance,
-      variance
+      variance,
+      InfinitePairsHandling.Drop
     )
 
   private def resolveBounds(
-    finitePairs: Dataset[PersistencePair],
+    pairs: Dataset[PersistencePair],
     boundsConfig: BirthAndPersistenceBoundsConfig
   ): (ImageBound, ImageBound) = {
-    import finitePairs.sparkSession.implicits._
+    import pairs.sparkSession.implicits._
 
     val (calcMinB, calcMaxB, calcMinP, calcMaxP) =
       if (
@@ -154,7 +162,7 @@ object PersistenceImage {
         boundsConfig.minPersistence.isEmpty ||
         boundsConfig.maxPersistence.isEmpty
       ) {
-        val row = finitePairs
+        val row = pairs
           .map(p => (p.birth.toDouble, p.persistence.toDouble))
           .agg(min("_1"), max("_1"), min("_2"), max("_2"))
           .head()
