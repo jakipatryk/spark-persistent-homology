@@ -76,7 +76,7 @@ The coboundary matrix reduction is performed in two phases within a loop. You ca
 Add the following dependency to your `build.sbt`:
 
 ```scala
-libraryDependencies += "io.github.jakipatryk" %% "spark-persistent-homology" % "0.1.0"
+libraryDependencies += "io.github.jakipatryk" %% "spark-persistent-homology" % "???" // replace with latest version
 ```
 
 ## Running Tests
