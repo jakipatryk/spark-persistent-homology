@@ -36,7 +36,7 @@ All main classes accept the following arguments:
 spark-submit \
   --class Torus2D \
   --master <master-url> \
-  performance-tests-assembly-0.1.0-SNAPSHOT.jar \
+  performance-tests-assembly-VERSION.jar \
   --case 4k-no-threshold \
   --outputPath s3://my-bucket/results/torus2d_4k
 ```
